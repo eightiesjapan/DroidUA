@@ -2,6 +2,9 @@
 #include <list>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_net.h>
+#ifdef __ANDROID__
+#include <gl4esinit.h>
+#endif
 #include "../fmtlib/printf.h"
 
 #include "system.h"
@@ -211,6 +214,9 @@ TTF_Font *LoadFont(const std::string &fontname, int height)
     if (!fnt)
         fmt::printf("Can't load font %s %d\n", fontname, height);
 
+#ifdef __ANDROID__
+    if (!fnt) SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Font failed: %s (%s)", fontname.c_str(), TTF_GetError());
+#endif
     return fnt;
 }
 
@@ -225,6 +231,12 @@ void Init(bool oldGL)
         return;
     }
     
+#ifdef __ANDROID__
+    // GL4ES translates the engine's legacy GL calls into this GLES2 context.
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#else
     if (oldGL)
     {
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
@@ -236,6 +248,7 @@ void Init(bool oldGL)
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
     }
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+#endif
 
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
@@ -248,6 +261,15 @@ void Init(bool oldGL)
     }
 
     cont = SDL_GL_CreateContext(window);
+#ifdef __ANDROID__
+    if (!cont) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "GLES context: %s", SDL_GetError());
+        return;
+    }
+    set_getprocaddress(SDL_GL_GetProcAddress);
+    initialize_gl4es();
+    SDL_Log("OpenUA GL: %s / %s", glGetString(GL_VENDOR), glGetString(GL_VERSION));
+#endif
 
     TTF_Init();
 

@@ -3026,6 +3026,11 @@ void GFXEngine::SetResolution(const Common::Point &res, bool windowed)
         picked = windd_func0__sub0("env/vid.def");
     }
     
+#ifdef __ANDROID__
+    // Keep the original interface at 640x480; scale it to the physical viewport.
+    picked.w = 640;
+    picked.h = 480;
+#endif
     if (!picked.windowed)
         System::SetVideoMode(Common::Point(picked.w, picked.h), SDL_WINDOW_FULLSCREEN_DESKTOP, &picked.mode);
     else

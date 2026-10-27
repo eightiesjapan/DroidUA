@@ -44,6 +44,9 @@
 #include "system/movie.h"
 #include "system/inivals.h"
 #include "obj3d.h"
+#ifdef __ANDROID__
+#include <unistd.h>
+#endif
 
 
 int dword_513638 = 0;
@@ -800,11 +803,32 @@ uint32_t maxTicks = 1000/60; // init on 60FPS
 
 int main(int argc, char *argv[])
 {
+#ifdef __ANDROID__
+    // Android activity supplies the writable directory holding imported data.
+    for (int i = 1; i + 1 < argc; ++i) {
+        if (std::string(argv[i]) == "-android-data") {
+            if (chdir(argv[i + 1]) != 0) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Cannot enter game data directory %s", argv[i + 1]);
+                return 1;
+            }
+            SDL_Log("OpenUA game data: %s", argv[i + 1]);
+            break;
+        }
+    }
+#endif
     for(int i = 0; i < argc; ++i)
         System::AddCmdLine( std::string(argv[i]) );
     
     System::IniConf::Init();
+#ifdef __ANDROID__
+    // SDL resolves relative filenames against app storage, not the CWD.
+    // Store absolute filesystem paths so font/resource loading reaches game/.
+    char androidGamePath[4096];
+    if (!getcwd(androidGamePath, sizeof(androidGamePath))) return 1;
+    FSMgr::iDir::setBaseDir(androidGamePath);
+#else
     FSMgr::iDir::setBaseDir("");
+#endif
     
     HandleMods();
     

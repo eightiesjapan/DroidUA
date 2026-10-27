@@ -1,5 +1,6 @@
 #include "glfuncs.h"
 #include <stdexcept>
+#include <string>
 
 namespace GFX
 {   
@@ -77,6 +78,10 @@ inline void SetGLFunc(T &pFunc, const char *name)
 
 bool Glext::init()
 {
+#ifdef __ANDROID__
+    // First prototype uses the fixed-function path through GL4ES.
+    return false;
+#endif
     int major = 0, minor = 0;
     SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &major);
     SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &minor);

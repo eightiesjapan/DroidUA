@@ -1,0 +1,40 @@
+OpenUA Android prototype - 2026-10-27
+
+Status: ARM64 APK builds and runs on Anbernic RG477V, Android 14.
+Verified: full-screen main menu, font rendering, tap into single-player screen.
+The interface uses 640x480 logical coordinates over the 1280x960 EGL surface.
+The 3D viewport still renders at display resolution; a true low-resolution 3D
+render target is a separate future change. Initial prototype forces 640x480 UI.
+
+Not yet validated: mission rendering, gameplay control mappings, saving on Android,
+audio/music as heard by the user, pause/resume reliability, expansion campaigns.
+Movies are intentionally stubbed out in movie_stub.cpp for this milestone.
+
+Development layout:
+D:\UA\Development\UA_source - GPLv2 engine with Android changes
+D:\UA\Development\Android\SDL2 - official SDL2 release-2.32.10
+D:\UA\Development\Android\Dependencies - native libraries pinned in DEPENDENCY_REVISIONS.txt
+D:\UA\Development\Android\GameData - private test copy, not part of this repository/APK
+
+Build using D:\UA\Development\Android\Build-OpenUA.ps1.
+The script uses project-local Java 21, Gradle cache and temporary folders.
+Debug signing key is outside this repository at Android\debug.keystore.
+Never upload game data, signing keys, build outputs or toolchain caches to the source repository.
+
+APK: android\app\build\outputs\apk\debug\app-debug.apk
+Application ID: org.openua.android
+Activity: org.openua.android/.OpenUAActivity
+Game data on device: /data/user/0/org.openua.android/files/game
+This development APK uses private app data; uninstalling it removes that copy.
+Use adb install -r to update without erasing its data.
+
+Graphics approach: SDL2 creates a GLES2 context, GL4ES translates legacy fixed-function
+OpenGL calls. Desktop shader/VBO path is disabled only on Android. Constructor-free
+GL4ES initialization happens after context creation. Movies are excluded from this
+build rather than introducing FFmpeg cross-compilation at the first milestone.
+The upstream Windows build remains independently available in Test-Windows.
+
+The copied SDL Java HIDDeviceManager has explicitly marked Android 13+ broadcast
+receiver scopes. This change is identified in comments at each altered registration.
+Original SDL licence is retained in SDL-LICENSE.txt. Dependency licences remain in
+each dependency source checkout. Resolve distribution packaging before public release.
