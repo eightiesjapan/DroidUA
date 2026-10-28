@@ -39,6 +39,11 @@ public:
   
 public:
     static void InitFirst();
+#ifdef __ANDROID__
+    static void AndroidPoll(bool playing, bool &grabbed);
+    static void AndroidApply(TInputState *input, bool playing, bool grabbed);
+    static Common::Point AndroidPointer() { return _mPos; }
+#endif
     
     static void OnMouseDown(Common::Point pos, int btn, int clkNum);
     static void OnMouseUp(Common::Point pos, int btn, int clkNum);

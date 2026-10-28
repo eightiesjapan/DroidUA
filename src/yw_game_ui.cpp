@@ -11136,7 +11136,11 @@ void NC_STACK_ypaworld::ypaworld_func64__sub1(TInputState *inpt)
         SetShowingTooltip(Locale::TIP_MOUSECAPTURED);
     }
 
+#ifdef __ANDROID__
+    if ( false ) // Desktop flight-stick translation is replaced by AndroidApply.
+#else
     if ( !v38 )
+#endif
     {
         int v13 = _userUnit->_bact_type == BACT_TYPES_TANK || _userUnit->_bact_type == BACT_TYPES_CAR;
         int v34 = _userUnit->_bact_type == BACT_TYPES_ROBO;

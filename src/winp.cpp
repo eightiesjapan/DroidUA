@@ -275,6 +275,9 @@ int NC_STACK_winp::InputWatch(void *, SDL_Event *event)
     case SDL_MOUSEMOTION:
     {
         Common::Point pos = GFX::GFXEngine::Instance.ConvertPosTo2DStuff( Common::Point(event->button.x, event->button.y) );
+#ifdef __ANDROID__
+        _mPos = pos; // The software cursor must also follow modal GUI movement.
+#endif
         Common::Point rel = Common::Point(event->motion.xrel, event->motion.yrel);
         if ( !Gui::Root::Instance.MouseMove(pos, rel) )
             OnMouseMove(pos, rel);
@@ -638,6 +641,9 @@ void NC_STACK_winp::ResetSlider()
 
 void NC_STACK_winp::CheckJoy()
 {
+#ifdef __ANDROID__
+    return; // Android uses standard SDL game-controller axes instead.
+#endif
     if ( _joyEnable )
     {
         uint32_t prevBtnState = _joyButtonStates;

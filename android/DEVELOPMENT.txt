@@ -38,3 +38,36 @@ The copied SDL Java HIDDeviceManager has explicitly marked Android 13+ broadcast
 receiver scopes. This change is identified in comments at each altered registration.
 Original SDL licence is retained in SDL-LICENSE.txt. Dependency licences remain in
 each dependency source checkout. Resolve distribution packaging before public release.
+Controller milestone - 2026-10-28
+Android now uses SDL GameController semantic axes rather than desktop flight-stick
+expressions. RG477V mapping is left axes 0/1, right 2/3, triggers 4/5; SDL supplies
+these mappings per device. Dead zone 18%; cursor speed is time-based.
+
+First layout (physical labels follow SDL device mapping):
+- Menus: left stick cursor, A or L1 left click, B or Start Escape/back.
+- Mission: R1 toggles vehicle/pointer mode. Left stick Y drives forward/backward
+  in vehicle mode; right stick turns/aims. In pointer mode left stick moves cursor.
+- L1 left click/hold/drag; L2 right click with original game semantics.
+- A primary fire; B secondary fire; R2 also primary fire, in vehicle mode.
+- Start original Escape/back/menu action; Select map; X next squad unit;
+  Y return to host station; D-pad Up/Down next/previous command submenu,
+  Left next commander, Right squad leader.
+- Home is reserved for Android. Clicking actual in-game controls still uses the
+  original HUD logic. The original game's Escape action can back out of vehicle
+  control before showing its menu, so Start is not a separate pause button.
+
+Original cursor images/hotspots are composited into the 640x480 logical UI;
+hardware cursor is suppressed to avoid duplicates with physical mice.
+Touch and SDL physical mouse events remain enabled. Physical Bluetooth mouse
+connection/disconnection, hover, wheel, buttons and mouse+controller combinations
+still need hardware testing; there is no Bluetooth-specific auto mode switch yet.
+Frame pacing is capped at 60 with fractional timing. Completed-frame FPS samples
+are logged every five seconds. No 120 FPS mode until game timing is audited.
+
+Verification: Android and Windows builds pass; installed in place preserving
+private game data. Original cursor visible in on-device menu screenshot.
+New physical controller layout, drag selection, vehicle types, and in-mission
+cursor mode remain pending user testing. No claim of completed gameplay QA.
+Remaining work includes adjustable controls/sensitivity, 30/60 FPS settings,
+resolution/UI scaling choices, optional touch overlay (hidden for handhelds),
+movie playback, and longer campaign/save testing.

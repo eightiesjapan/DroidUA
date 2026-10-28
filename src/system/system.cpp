@@ -354,7 +354,32 @@ Common::Point GetResolution()
 
 void Flip()
 {
+#ifdef __ANDROID__
+    // The desktop 1000/60 integer timer actually permits about 62 FPS.
+    // A fractional deadline keeps this prototype at 60 on 120 Hz displays too.
+    const Uint64 frequency = SDL_GetPerformanceFrequency();
+    const Uint64 period = frequency / 60;
+    static Uint64 deadline = SDL_GetPerformanceCounter();
+    Uint64 tick = SDL_GetPerformanceCounter();
+    if (tick > deadline + period) deadline = tick;
+    while (tick < deadline) {
+        SDL_Delay(1);
+        tick = SDL_GetPerformanceCounter();
+    }
+    deadline += period;
+#endif
     SDL_GL_SwapWindow(window);
+#ifdef __ANDROID__
+    // Count completed frames for device testing; no refresh-rate assumption.
+    static Uint32 sampleStart = SDL_GetTicks(), frames = 0;
+    ++frames;
+    const Uint32 now = SDL_GetTicks();
+    if (now - sampleStart >= 5000) {
+        SDL_Log("OpenUA rendered FPS: %.1f over %.1f seconds", frames * 1000.0f / (now - sampleStart), (now - sampleStart) / 1000.0f);
+        frames = 0;
+        sampleStart = now;
+    }
+#endif
 }
 
 void SetVideoMode(const Common::Point &sz, uint32_t full, SDL_DisplayMode *mode)

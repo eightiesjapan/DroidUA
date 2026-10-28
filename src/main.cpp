@@ -431,8 +431,14 @@ int ProcessMenuFrame()
 
 int ProcessNextFrame()
 {
+#ifdef __ANDROID__
+    NC_STACK_winp::AndroidPoll(GameScreenMode == GAME_SCREEN_MODE_GAME, ypaworld->_mouseGrabbed);
+#endif
     input_states = TInputState();
     Input::Engine.QueryInput(&input_states);
+#ifdef __ANDROID__
+    NC_STACK_winp::AndroidApply(&input_states, GameScreenMode == GAME_SCREEN_MODE_GAME, ypaworld->_mouseGrabbed);
+#endif
 
     if ( userdata.ResetInputPeriod )
     {

@@ -19,10 +19,20 @@
 #include "../font.h"
 #include "inivals.h"
 #include "glfuncs.h"
+#ifdef __ANDROID__
+#include "../winp.h"
+#endif
 
 namespace GFX
 {   
 GFXEngine GFXEngine::Instance;
+#ifdef __ANDROID__
+struct AndroidCursor {
+    std::shared_ptr<SDL_Surface> image;
+    int hotX = 0, hotY = 0;
+};
+static std::map<std::string, AndroidCursor> androidCursors;
+#endif
 
 int GFXEngine::can_srcblend;
 int GFXEngine::can_destblend;
@@ -1828,6 +1838,21 @@ void GFXEngine::EndFrame()
     }    
 
     Gui::Root::Instance.Draw(Screen());
+#ifdef __ANDROID__
+    // Android has no visible system pointer for joystick-generated movement.
+    // Composite the original cursor into the logical UI before uploading it.
+    static const char *names[] = {"Pointer", "Cancel", "Select", "Attack", "Goto", "Disk", "New", "Add", "Control", "Beam", "Build"};
+    if (CurrentCursorID > 0 && CurrentCursorID <= 11) {
+        auto found = androidCursors.find(names[CurrentCursorID - 1]);
+        if (found != androidCursors.end() && found->second.image) {
+            const Common::Point p = NC_STACK_winp::AndroidPointer();
+            SDL_Rect dest = {p.x - found->second.hotX, p.y - found->second.hotY, 0, 0};
+            SDL_SetClipRect(Screen(), nullptr);
+            SDL_BlitSurface(found->second.image.get(), nullptr, Screen(), &dest);
+        }
+    }
+    SDL_ShowCursor(SDL_DISABLE);
+#endif
     DrawScreenSurface();
     Gui::Root::Instance.HwCompose();
     
@@ -2131,6 +2156,21 @@ void GFXEngine::draw2DandFlush()
         Glext::GLBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     Gui::Root::Instance.Draw(Screen());
+#ifdef __ANDROID__
+    // Android has no visible system pointer for joystick-generated movement.
+    // Composite the original cursor into the logical UI before uploading it.
+    static const char *names[] = {"Pointer", "Cancel", "Select", "Attack", "Goto", "Disk", "New", "Add", "Control", "Beam", "Build"};
+    if (CurrentCursorID > 0 && CurrentCursorID <= 11) {
+        auto found = androidCursors.find(names[CurrentCursorID - 1]);
+        if (found != androidCursors.end() && found->second.image) {
+            const Common::Point p = NC_STACK_winp::AndroidPointer();
+            SDL_Rect dest = {p.x - found->second.hotX, p.y - found->second.hotY, 0, 0};
+            SDL_SetClipRect(Screen(), nullptr);
+            SDL_BlitSurface(found->second.image.get(), nullptr, Screen(), &dest);
+        }
+    }
+    SDL_ShowCursor(SDL_DISABLE);
+#endif
     DrawScreenSurface();
     Gui::Root::Instance.HwCompose();
 
@@ -2612,6 +2652,13 @@ SDL_Cursor *GFXEngine::LoadCursor(const std::string &name)
     free(data);
     free(mask);
 
+#ifdef __ANDROID__
+    AndroidCursor &saved = androidCursors[name];
+    saved.image.reset(SDL_ConvertSurface(cursr, cursr->format, 0), SDL_FreeSurface);
+    saved.hotX = hotX;
+    saved.hotY = hotY;
+    SDL_SetSurfaceBlendMode(saved.image.get(), SDL_BLENDMODE_BLEND);
+#endif
     SDL_Cursor* cursor = SDL_CreateColorCursor(cursr, hotX, hotY);
 
     SDL_FreeSurface(cursr);
