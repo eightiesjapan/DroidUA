@@ -233,6 +233,8 @@ void Init(bool oldGL)
     }
     
 #ifdef __ANDROID__
+    // SDL otherwise permits portrait for resizable windows, overriding the manifest.
+    SDL_SetHint(SDL_HINT_ORIENTATIONS,"LandscapeLeft LandscapeRight");
     // GL4ES translates the engine's legacy GL calls into this GLES2 context.
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);

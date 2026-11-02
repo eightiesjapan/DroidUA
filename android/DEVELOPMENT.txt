@@ -179,3 +179,22 @@ Validation: Android build passed; installed in place on RG477V. Dragged slider,
 saved low opacity and verified faint controls in Training 2, then 100 and verified
 solid controls. Restart retained preference; Cancel discarded a changed draft.
 Restored approximately the previous 75% appearance, other preferences unchanged.
+
+2026-11-02 Pixel 9a first hardware validation
+Connected Pixel 9a (Android 17, ARM64, 1080x2424 physical). Installed debug APK
+and transferred existing 400 MB game-data archive into private files/game.
+No uninstall or global display/rotation setting changes. Phone preferences:
+Automatic widescreen, Large UI, 60 FPS, Touch Auto, FPS On, opacity 75%.
+Fixed SDL resizable-window default overriding manifest landscape by setting
+SDL_HINT_ORIENTATIONS to LandscapeLeft LandscapeRight before window creation.
+Exit/reopen revealed released Input timer pointer and stale process-wide GL/
+engine state. Clear timer pointer on Deinit. Activity now completes SDL teardown
+then terminates only its own process when finishing, so next launch has fresh
+native state. Home/background retains the running activity normally.
+Android and Windows builds passed. Pixel tests: menu/options touch navigation,
+widescreen Training 2 rendering ~60 FPS in short sample, automatic phone overlay,
+Map/Pan, unobstructed vehicle chooser; Exit followed by cold reopening displays
+menu correctly and Home/resume displays menu. Actual listening, simultaneous
+multi-finger play and extended gameplay remain for user testing. Movies still
+stubbed. Kept 4:3 menus/briefings; observed existing Large briefing text clipping
+at left/title, not addressed in this setup pass.

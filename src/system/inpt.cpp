@@ -242,8 +242,10 @@ int INPEngine::Init()
 
 void INPEngine::Deinit()
 {
-    if ( _timer )
+    if ( _timer ) {
         _timer->Delete();
+        _timer = nullptr; // A later engine start must not delete the released timer again.
+    }
 
     for (InputNodeList &lst : _buttons)
         FreeKNodes(&lst);

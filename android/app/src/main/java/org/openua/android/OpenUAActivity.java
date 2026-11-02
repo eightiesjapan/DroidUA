@@ -21,6 +21,14 @@ public class OpenUAActivity extends org.libsdl.app.SDLActivity {
         });
         getWindow().getDecorView().requestApplyInsets();
     }
+    @Override protected void onDestroy() {
+        boolean finished=isFinishing();
+        super.onDestroy(); // SDL joins the native thread and releases its resources first.
+        // The legacy engine/GL wrapper own process-wide state. A completed Exit
+        // must start with fresh native globals next time, rather than reuse them.
+        // Home/background pause never finishes the activity and keeps the game alive.
+        if (finished) android.os.Process.killProcess(android.os.Process.myPid());
+    }
     @Override protected String[] getLibraries() { return new String[] { "SDL2", "SDL2_image", "gl4es", "main" }; }
     @Override protected String[] getArguments() {
         File data = new File(getFilesDir(), "game");
