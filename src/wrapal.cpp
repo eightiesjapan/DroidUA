@@ -132,6 +132,22 @@ waldev::~waldev()
     alcCloseDevice(dev);
 }
 
+#ifdef __ANDROID__
+void waldev::SetSuspended(bool paused)
+{
+    if (!_inited) return;
+    SDL_LockMutex(mutex);
+    suspended=paused;
+    // OpenAL is independent of SDL's audio backend. Pause the whole device so
+    // music and looping effects retain their positions while the app sleeps.
+    auto change=reinterpret_cast<void (*)(ALCdevice *)>(alcGetProcAddress(dev,
+        paused ? "alcDevicePauseSOFT" : "alcDeviceResumeSOFT"));
+    if(change) {change(dev); SDL_Log("OpenUA audio device %s",paused ? "paused" : "resumed");}
+    else SDL_LogError(SDL_LOG_CATEGORY_AUDIO,"OpenAL device pause extension unavailable");
+    SDL_UnlockMutex(mutex);
+}
+#endif
+
 bool waldev::inited()
 {
     return _inited;
@@ -204,6 +220,9 @@ bool waldev::update()
 {
     if (SDL_LockMutex(mutex) == 0)
     {
+#ifdef __ANDROID__
+        if (suspended) { SDL_UnlockMutex(mutex); return ende; }
+#endif
         for(std::list<CTsmpl *>::iterator it = sample_list.begin(); it != sample_list.end(); ++it)
         {
             CTsmpl *smpl = *it;

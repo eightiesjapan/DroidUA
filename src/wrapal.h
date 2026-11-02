@@ -193,6 +193,9 @@ public:
     ~waldev();
 
     bool inited();
+#ifdef __ANDROID__
+    void SetSuspended(bool paused);
+#endif
 
     walsmpl *newSample();
     walmus *createMusicPlayer();
@@ -207,6 +210,9 @@ private:
     ALCcontext *cont;
     bool _inited;
     bool ende;
+#ifdef __ANDROID__
+    bool suspended=false;
+#endif
 
     std::list<CTsmpl *> sample_list;
 

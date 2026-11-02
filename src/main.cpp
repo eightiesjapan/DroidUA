@@ -6,6 +6,7 @@
 #include "includes.h"
 #include "system/gfx.h"
 #include "system/inpt.h"
+#include "system/sound.h"
 #include "winp.h"
 #include "wintimer.h"
 
@@ -46,6 +47,7 @@
 #include "obj3d.h"
 #ifdef __ANDROID__
 #include <unistd.h>
+#include <atomic>
 #endif
 
 
@@ -807,6 +809,27 @@ int WinMain__sub0()
 
 uint32_t maxTicks = 1000/60; // init on 60FPS
 
+#ifdef __ANDROID__
+static std::atomic<bool> androidSuspended(false);
+static int AndroidLifecycle(void *,SDL_Event *event)
+{
+    if(event->type==SDL_APP_WILLENTERBACKGROUND) {
+        androidSuspended=true;
+        NC_STACK_winp::AndroidReset();
+        if(SFXEngine::SFXe.digDriver) SFXEngine::SFXe.digDriver->SetSuspended(true);
+        SDL_Log("OpenUA suspended at game time %d",ypaworld ? ypaworld->_timeStamp : -1);
+    } else if(event->type==SDL_APP_DIDENTERFOREGROUND) {
+        if(SFXEngine::SFXe.digDriver) SFXEngine::SFXe.digDriver->SetSuspended(false);
+        // Exclude sleep time even for a brief background switch below 2 seconds.
+        if(Input::Engine._timer) Input::Engine._timer->itimer_func64();
+        userdata.ResetInputPeriod=true;
+        androidSuspended=false;
+        SDL_Log("OpenUA resumed at game time %d",ypaworld ? ypaworld->_timeStamp : -1);
+    }
+    return 1;
+}
+#endif
+
 int main(int argc, char *argv[])
 {
 #ifdef __ANDROID__
@@ -856,6 +879,9 @@ int main(int argc, char *argv[])
 
     System::IniConf::ReadFromNucleusIni();
 
+#ifdef __ANDROID__
+    SDL_AddEventWatch(AndroidLifecycle,nullptr);
+#endif
     uint32_t ticks = 0;
     
     Gui::Root::Instance.SetHwCompose(true);
@@ -900,7 +926,17 @@ int main(int argc, char *argv[])
 
     while ( true )
     {
-
+#ifdef __ANDROID__
+        // Pump SDL lifecycle events before advancing the world. SDL blocks here
+        // while backgrounded and restores its GL context before returning.
+        if(System::ProcessEvents()) break;
+        bool quitWhileSleeping=false;
+        while(androidSuspended) {
+            if(System::ProcessEvents()) {quitWhileSleeping=true;break;}
+            SDL_Delay(20);
+        }
+        if(quitWhileSleeping) break;
+#endif
         if (GFX::Engine.FpsMaxTicks == 0)
         {
             if ( !ProcessNextFrame() )
@@ -946,6 +982,9 @@ int main(int argc, char *argv[])
 
     }
     
+#ifdef __ANDROID__
+    SDL_DelEventWatch(AndroidLifecycle,nullptr);
+#endif
     ypaworld->DeleteNewGuiElements();
     
     sub_4113E8();

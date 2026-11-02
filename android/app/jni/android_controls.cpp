@@ -19,7 +19,7 @@ bool touchPlaying=false, touchPointer=false, manualTouchHeld=false, releaseTouch
 Uint32 currentButtons=0, touchPressedLatch=0;
 
 float touchPanX=0,touchPanY=0;
-std::array<AndroidTouch::Control,7> TouchLayout() {
+std::array<AndroidTouch::Control,5> TouchLayout() {
     auto size=GFX::Engine.GetScreenSize();
     return AndroidTouch::Layout(size.x,size.y,touchPointer,UAAndroidMapIsOpen());
 }
@@ -41,8 +41,7 @@ void TouchAxes(float &lx,float &ly,float &rx,float &ry,Uint32 &buttons) {
     buttons |= touchPressedLatch;
     touchPressedLatch=0;
     const int mapping[]={-1,-1,SDL_CONTROLLER_BUTTON_A,SDL_CONTROLLER_BUTTON_B,
-        SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_START,
-        SDL_CONTROLLER_BUTTON_LEFTSHOULDER};
+        SDL_CONTROLLER_BUTTON_RIGHTSHOULDER};
     for(const auto &entry:fingers) {
         int c=entry.second.control;
         if(c<0) continue;
@@ -72,6 +71,19 @@ float axis(SDL_GameControllerAxis a) {
     const float dead = 0.18f;
     return std::fabs(v) <= dead ? 0.0f : std::copysign((std::min(std::fabs(v), 1.0f) - dead) / (1.0f - dead), v);
 }
+}
+
+void NC_STACK_winp::AndroidReset()
+{
+    fingers.clear(); touchPressedLatch=0; currentButtons=previous=0;
+    for(const auto &key:previousKeys) if(key.second) KeyUp(key.first);
+    previousKeys.clear();
+    if(leftClick || manualTouchHeld) OnMouseUp(_mPos,SDL_BUTTON_LEFT,1);
+    if(rightClick || r1Held) OnMouseUp(_mPos,SDL_BUTTON_RIGHT,1);
+    leftClick=rightClick=manualTouchHeld=releaseTouchMouse=false;
+    r1Held=r1Pressed=false; r1Map=nullptr; r1Gesture=AndroidPointerGesture();
+    moveX=moveY=lookX=lookY=touchPanX=touchPanY=0;
+    lastTick=0;
 }
 
 void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
@@ -239,8 +251,7 @@ bool NC_STACK_winp::AndroidTouchEvent(SDL_Event *event)
 
         if(control>=2) {
             static const int mapping[]={-1,-1,SDL_CONTROLLER_BUTTON_A,SDL_CONTROLLER_BUTTON_B,
-                SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_START,
-                SDL_CONTROLLER_BUTTON_LEFTSHOULDER};
+                SDL_CONTROLLER_BUTTON_RIGHTSHOULDER};
             touchPressedLatch |= 1u << mapping[control];
         }
     }

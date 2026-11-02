@@ -5,6 +5,11 @@
 #include "utils.h"
 #include "system/gfx.h"
 #include "system/inpt.h"
+#ifdef __ANDROID__
+#include "system/android_display.h"
+#include "system/system.h"
+#include <memory>
+#endif
 
 #include "font.h"
 
@@ -309,6 +314,13 @@ void NC_STACK_button::ShowScreen()
 {
     if ( !visible )
     {
+#ifdef __ANDROID__
+        // Bottom menu strips originally reserve only a font-height click area.
+        if(!Android::InMission() && h<24 && y+h>=GFX::Engine.GetScreenH()-2) {
+            int extra=24-h; y-=extra; h+=extra;
+            for(size_t i=0;i<field_d8.size();++i) {field_d8[i].ypos+=extra; buttons[i].y+=extra;}
+        }
+#endif
         visible = true;
         Input::Engine.AddClickBoxFront(this);
     }
@@ -724,6 +736,46 @@ void NC_STACK_button::button_func70__sub0(button_str2 *sbt, CmdStream *pbuf)
     }
 }
 
+#ifdef __ANDROID__
+bool NC_STACK_button::AndroidDrawButton(size_t index)
+{
+    auto &b=field_d8[index];
+    if(Android::InMission() || b.button_type!=TYPE_BUTTON || !(b.flags&FLAG_TEXT) ||
+       !(b.flags&FLAG_BORDER) || (b.button_id>=6000 && b.button_id<=6004)) return false;
+    const int base=GFX::Engine.GetTileset(b.tileset_up)->h;
+    int top=std::max(0,std::min(int(b.ypos)-(24-base)/2,int(h)-24));
+    int bottom=std::min(int(h),top+24);
+    // Keep dense dialogs/Options rows separated; roomy menu rows grow to 24.
+    for(const auto &other:field_d8) {
+        if(!(other.flags&FLAG_DRAW) || other.ypos==b.ypos ||
+           other.xpos+other.width<=b.xpos || other.xpos>=b.xpos+b.width) continue;
+        if(other.ypos<b.ypos) top=std::max(top,int(other.ypos)+base+2);
+        else bottom=std::min(bottom,int(other.ypos)-2);
+    }
+    if(bottom-top<=base) return false;
+    auto &hit=buttons[index];
+    if(!(b.flags&FLAG_DISABLED)) {hit.x=b.xpos;hit.y=top;hit.w=b.width;hit.h=bottom-top;}
+    auto screen=GFX::Engine.Screen();
+    SDL_Rect frame{x+b.xpos,y+top,b.width,bottom-top};
+    SDL_FillRect(screen,&frame,SDL_MapRGBA(screen->format,120,153,159,255));
+    SDL_Rect inner{frame.x+1,frame.y+1,frame.w-2,frame.h-2};
+    bool pressed=b.flags&FLAG_PRESSED, disabled=b.flags&FLAG_DISABLED;
+    SDL_FillRect(screen,&inner,SDL_MapRGBA(screen->format,pressed?38:70,pressed?63:99,pressed?72:110,255));
+    static std::shared_ptr<TTF_Font> font(System::LoadFont("Liberation Sans",14),TTF_CloseFont);
+    const auto &caption=pressed ? b.caption2 : b.caption;
+    SDL_Color color{Uint8(disabled?110:b.txt_r),Uint8(disabled?130:b.txt_g),Uint8(disabled?130:b.txt_b),255};
+    if(font) {
+        std::unique_ptr<SDL_Surface,decltype(&SDL_FreeSurface)> label(TTF_RenderUTF8_Blended(font.get(),caption.c_str(),color),SDL_FreeSurface);
+        if(label) {
+            int width=std::min(label->w,inner.w-6),height=std::min(label->h,inner.h);
+            SDL_Rect dest{frame.x+(frame.w-width)/2,frame.y+(frame.h-height)/2,width,height};
+            SDL_BlitScaled(label.get(),nullptr,screen,&dest);
+        }
+    }
+    return true;
+}
+#endif
+
 size_t NC_STACK_button::Draw()
 {
     static CmdStream button_tmpbuf;
@@ -736,6 +788,9 @@ size_t NC_STACK_button::Draw()
         {
             if ( it->flags & FLAG_DRAW )
             {
+#ifdef __ANDROID__
+                if(AndroidDrawButton(size_t(it-field_d8.begin()))) continue;
+#endif
                 if ( it->flags & FLAG_TEXT )
                     button_func70__sub1(&*it, &button_tmpbuf);
                 else

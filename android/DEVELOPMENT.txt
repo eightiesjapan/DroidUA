@@ -219,3 +219,30 @@ For RG477V this is 533x400 or 640x480; Pixel Automatic is 898x400 or 1077x480.
 Pixel Original 4:3 mode instead uses centred 1440x1080 mission viewport.
 RG477V is not connected in this pass; new build uses same shared code/APK but
 full-display changes on that physical device await regression play testing.
+
+2026-11-02 Minimal overlay, app sleep and larger menu buttons
+Removed touch Click/Menu, leaving Move/Cursor, Look/Pan, Fire, Alt and Mode.
+Mode is at logical (160,h-65), beside left pad. Physical gamepad bindings remain.
+Existing touch geometry/hit-target tests pass for handheld and Pixel sizes.
+
+Added Android SDL lifecycle watch after engine initialization and removed before
+engine teardown. Background/screen-off clears held touch/gamepad-generated input,
+pauses the independent OpenAL device via ALC_SOFT_pause_device, and blocks world
+updates until SDL restores foreground/GL state. Resume resets input period to
+exclude sleep (including brief app switches) without changing manual game pause.
+OpenAL update thread skips sample processing while device is suspended.
+
+Android text menu buttons now have taller up-to-24 logical pixel backgrounds,
+centred larger labels and matching hit areas, with spacing clamps for dense
+rows. Narrow bottom menu clickboxes expand upward to contain their larger
+buttons. Original gameplay HUD and desktop rendering remain unchanged.
+
+Validation: Android and Windows builds passed. Pixel menu/main screen and
+campaign Save/Load/Last Saved/Main Menu strip screenshots confirm larger buttons;
+taps in newly expanded areas navigate successfully. Options OK/Cancel/Help fit.
+Training mission screenshot confirms five controls with Mode next to left pad.
+Screen-off test logs pause and resume at identical game time 1581; Home switch
+logs pause/resume at identical game time 277224. OpenAL confirms audio device
+pause/resume; resumed mission renders normally. No global screen/lock settings
+changed. APK updated in place, saved preferences retained.
+User can now connect RG477V for same APK update and sleep regression testing.

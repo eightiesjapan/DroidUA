@@ -181,6 +181,9 @@ public:
     virtual int getBTN_h();
 
 protected:
+#ifdef __ANDROID__
+    bool AndroidDrawButton(size_t index);
+#endif
     void UpdateSlider(button_str2 *sbt);
     void button_func70__sub1(button_str2 *sbt, CmdStream *pbuf);
     void button_func70__sub0(button_str2 *sbt, CmdStream *pbuf);

@@ -40,6 +40,7 @@ public:
 public:
     static void InitFirst();
 #ifdef __ANDROID__
+    static void AndroidReset();
     static void AndroidPoll(bool playing, bool &grabbed);
     static bool AndroidTouchEvent(SDL_Event *event);
     static void AndroidDrawTouchControls(SDL_Surface *screen);
