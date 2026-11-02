@@ -3,23 +3,32 @@ package org.openua.android;
 import java.io.File;
 
 public class OpenUAActivity extends org.libsdl.app.SDLActivity {
-    private volatile int[] contentInsets = new int[] {0,0,0,0};
-    public int[] getContentInsets() { return contentInsets.clone(); }
+    // Native rendering uses the full surface; subtracting system insets again
+    // creates black strips on phones. Immersive mode hides navigation bars.
+    public int[] getContentInsets() { return new int[] {0,0,0,0}; }
+    private void useFullDisplay() {
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            android.view.WindowManager.LayoutParams attrs=getWindow().getAttributes();
+            attrs.layoutInDisplayCutoutMode=android.os.Build.VERSION.SDK_INT >= 30
+                ? android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                : android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(attrs);
+        }
+        getWindow().getDecorView().setSystemUiVisibility(
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN |
+            android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+            android.view.View.SYSTEM_UI_FLAG_FULLSCREEN |
+            android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+            android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+    }
     @Override protected void onCreate(android.os.Bundle state) {
         super.onCreate(state);
-        getWindow().getDecorView().setOnApplyWindowInsetsListener((view, insets) -> {
-            int left=0, top=0, right=0, bottom=0;
-            if (android.os.Build.VERSION.SDK_INT >= 28 && insets.getDisplayCutout() != null) {
-                android.view.DisplayCutout cutout=insets.getDisplayCutout();
-                left=cutout.getSafeInsetLeft(); top=cutout.getSafeInsetTop();
-                right=cutout.getSafeInsetRight(); bottom=cutout.getSafeInsetBottom();
-            }
-            contentInsets=new int[] {Math.max(left,insets.getSystemWindowInsetLeft()),
-                Math.max(top,insets.getSystemWindowInsetTop()),Math.max(right,insets.getSystemWindowInsetRight()),
-                Math.max(bottom,insets.getSystemWindowInsetBottom())};
-            return insets;
-        });
-        getWindow().getDecorView().requestApplyInsets();
+        useFullDisplay();
+    }
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        if (focused) useFullDisplay();
     }
     @Override protected void onDestroy() {
         boolean finished=isFinishing();

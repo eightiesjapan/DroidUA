@@ -198,3 +198,24 @@ menu correctly and Home/resume displays menu. Actual listening, simultaneous
 multi-finger play and extended gameplay remain for user testing. Movies still
 stubbed. Kept 4:3 menus/briefings; observed existing Large briefing text clipping
 at left/title, not addressed in this setup pass.
+
+2026-11-02 Full display and simplified phone controls
+User requested removal of left/bottom gameplay gaps on Pixel. Activity now opts
+into drawing through the camera-cutout area, uses immersive layout/hides bars,
+and re-applies this on focus. Native getContentInsets returns zero because the
+render surface itself covers the display; menus still fit centred original 4:3.
+Verified SDL surface 2424x1080 on Pixel 9a and mission screenshot has no black
+left/bottom strips. Original 4:3 menu screenshot is centred at 1440x1080.
+Reduced touch layout from 10 to 7 controls: removed Host, Next, Map; Click moved
+to old Next position. Retained Move/Cursor, Look/Pan, Fire, Alt, Mode and Menu.
+Physical gamepad mappings unchanged. Native bottom HUD map remains accessible;
+verified Mode, HUD map tap and touch Pan on Pixel. Frame samples remain ~60 FPS.
+Android build and geometry/hit-target tests passed, including Pixel logical
+898x400 Large and 1077x480 Standard. APK installed in place; preferences retained.
+Rendering explanation: 3D rasterizes at native viewport resolution (Pixel full
+2424x1080 Automatic; RG477V full 1280x960). Interface is separately rasterized at
+logical height 400 Large or 480 Standard with aspect-matched width and scaled up.
+For RG477V this is 533x400 or 640x480; Pixel Automatic is 898x400 or 1077x480.
+Pixel Original 4:3 mode instead uses centred 1440x1080 mission viewport.
+RG477V is not connected in this pass; new build uses same shared code/APK but
+full-display changes on that physical device await regression play testing.

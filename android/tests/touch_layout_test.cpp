@@ -4,7 +4,7 @@
 #include <cstring>
 #include <iostream>
 int main() {
-    for(auto size: {std::array<float,2>{640,480}, {533,400}, {853,480}, {1067,480}}) {
+    for(auto size: {std::array<float,2>{640,480}, {533,400}, {853,480}, {1067,480}, {898,400}, {1077,480}}) {
         auto controls=AndroidTouch::Layout(size[0],size[1],true,true);
         for(const auto &c:controls) {
             assert(c.x-c.r>=0 && c.x+c.r<=size[0]);

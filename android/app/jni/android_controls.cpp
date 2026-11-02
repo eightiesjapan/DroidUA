@@ -17,9 +17,9 @@ struct TouchFinger { int control; float x,y; };
 std::map<SDL_FingerID,TouchFinger> fingers;
 bool touchPlaying=false, touchPointer=false, manualTouchHeld=false, releaseTouchMouse=false;
 Uint32 currentButtons=0, touchPressedLatch=0;
-bool touchMapRequested=false;
+
 float touchPanX=0,touchPanY=0;
-std::array<AndroidTouch::Control,10> TouchLayout() {
+std::array<AndroidTouch::Control,7> TouchLayout() {
     auto size=GFX::Engine.GetScreenSize();
     return AndroidTouch::Layout(size.x,size.y,touchPointer,UAAndroidMapIsOpen());
 }
@@ -34,16 +34,15 @@ void TouchAxes(float &lx,float &ly,float &rx,float &ry,Uint32 &buttons) {
             if(it->second.control>=0) it=fingers.erase(it); else ++it;
         }
         touchPressedLatch=0;
-        touchMapRequested=false;
+
         return;
     }
     auto layout=TouchLayout();
     buttons |= touchPressedLatch;
     touchPressedLatch=0;
     const int mapping[]={-1,-1,SDL_CONTROLLER_BUTTON_A,SDL_CONTROLLER_BUTTON_B,
-        SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_BACK,
-        SDL_CONTROLLER_BUTTON_START,SDL_CONTROLLER_BUTTON_LEFTSHOULDER,
-        SDL_CONTROLLER_BUTTON_X,SDL_CONTROLLER_BUTTON_Y};
+        SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_START,
+        SDL_CONTROLLER_BUTTON_LEFTSHOULDER};
     for(const auto &entry:fingers) {
         int c=entry.second.control;
         if(c<0) continue;
@@ -116,8 +115,8 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
     if (playing && !wasPlaying) grabbed = true;
     if (!playing) grabbed = false;
 
-    if (pressed(SDL_CONTROLLER_BUTTON_START) || touchMapRequested) grabbed = false;
-    touchMapRequested=false;
+    if (pressed(SDL_CONTROLLER_BUTTON_START)) grabbed = false;
+
     const bool pointer = !playing || !grabbed;
     const Uint32 now = SDL_GetTicks();
     const float dt = lastTick ? std::min((now - lastTick) / 1000.0f, 0.05f) : 0.0f;
@@ -237,11 +236,11 @@ bool NC_STACK_winp::AndroidTouchEvent(SDL_Event *event)
         if(!Android::InsideViewport(int(event->tfinger.x*real.x),int(event->tfinger.y*real.y))) return true;
         int control=AndroidTouch::HitTest(TouchLayout(),p.x,p.y,Android::TouchVisible());
         fingers[id]={control,float(p.x),float(p.y)};
-        if(control==5) touchMapRequested=true;
+
         if(control>=2) {
             static const int mapping[]={-1,-1,SDL_CONTROLLER_BUTTON_A,SDL_CONTROLLER_BUTTON_B,
-                SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_BACK,SDL_CONTROLLER_BUTTON_START,
-                SDL_CONTROLLER_BUTTON_LEFTSHOULDER,SDL_CONTROLLER_BUTTON_X,SDL_CONTROLLER_BUTTON_Y};
+                SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_START,
+                SDL_CONTROLLER_BUTTON_LEFTSHOULDER};
             touchPressedLatch |= 1u << mapping[control];
         }
     }
