@@ -131,3 +131,27 @@ cutout/navigation-inset behaviour, simultaneous multi-touch and longer phone pla
 longer campaigns/vehicle physics at 30 FPS. Current landscape orientation remains
 fixed; foldables/multi-window resize during a mission are not yet validated.
 Movies, game-data importer and Bluetooth mouse hardware validation remain separate.
+
+2026-11-02 Touch HUD clearance and map Pan follow-up
+User photos showed Mode/Map/Click/Menu covering original bottom command buttons.
+Raised this row from logical y=h-32 to h-65. Overlay hit circles now end at least
+40 logical pixels above screen bottom, leaving the original HUD accessible.
+Extracted touch layout into android_touch_layout.h. Standalone tests cover
+Standard 640x480, Large 533x400, and wide 853x480/1067x480 layouts; verify every
+control is within bounds, above HUD, and does not overlap another touch circle.
+
+In pointer mode with the map open, right touch pad is now labelled Pan and moves
+the map view directly using existing zoom scales and normal map-bound clamping.
+No cursor hover or held Mode button required; physical R1+stick handling remains.
+The touch Map shortcut automatically enters pointer mode. Mode still toggles
+vehicle control. Pan pad moves view in the pushed direction and disables follow-
+unit so the map does not snap back. Panning cancels a concurrent Mode/R1 gesture
+rather than toggling camera mode accidentally on release.
+
+Validation: Android/Windows builds and layout, display geometry, R1 gesture tests
+pass. On-device Large UI screenshot confirms unobstructed original bottom HUD.
+In Training Mission 2, verified touch Map opens pointer mode/Pan label, swiping
+Pan moves map contents without camera movement, and direct dragging of the blue
+map title bar repositions the entire map window. User preferences retained:
+Automatic layout, Large UI, 60 FPS, Touch Show, FPS On. APK updated in place.
+Pixel 9a hardware test still pending connection; needs APK plus private game data.

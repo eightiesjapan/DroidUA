@@ -91,6 +91,14 @@ bool UAAndroidMapIsOpen()
 {
     return robo_map.IsOpen() && !(robo_map.flags & GuiBase::FLAG_ICONIFED);
 }
+void UAAndroidPanMap(float x,float y)
+{
+    if (!UAAndroidMapIsOpen()) return;
+    robo_map.field_1ED=0; // Turn off follow-unit so the view stays where it is panned.
+    robo_map.field_1D8 += x*robo_map.field_1E0;
+    robo_map.field_1DC -= y*robo_map.field_1E4;
+    // The normal map update clamps the centre to the level's bounds afterward.
+}
 #endif
 
 typedef int (*mapFunc)(NC_STACK_ypaworld *yw, int x, int y);

@@ -1,10 +1,12 @@
 #ifdef __ANDROID__
 #include "winp.h"
 #include "android_pointer_gesture.h"
+#include "android_touch_layout.h"
 #include "system/android_display.h"
 
 bool UAAndroidMapIsTarget(const TClickBoxInf &input);
 bool UAAndroidMapIsOpen();
+void UAAndroidPanMap(float x,float y);
 #include "system/gfx.h"
 #include "system/system.h"
 #include <algorithm>
@@ -15,14 +17,11 @@ struct TouchFinger { int control; float x,y; };
 std::map<SDL_FingerID,TouchFinger> fingers;
 bool touchPlaying=false, touchPointer=false, manualTouchHeld=false, releaseTouchMouse=false;
 Uint32 currentButtons=0, touchPressedLatch=0;
-struct TouchControl { float x,y,r; const char *label; };
-std::array<TouchControl,10> TouchLayout() {
-    auto size=GFX::Engine.GetScreenSize(); float w=size.x,h=size.y;
-    return {{{70,h-90,48,touchPointer ? "Cursor" : "Move"},{w-70,h-90,48,"Look"},
-        {w-55,h-180,25,"Fire"},{w-120,h-155,25,"Alt"},
-        {w/2-90,h-32,25,"Mode"},{w/2-30,h-32,25,"Map"},
-        {w/2+90,h-32,25,"Menu"},{w/2+30,h-32,25,"Click"},
-        {140,h-165,25,"Next"},{195,h-130,25,"Host"}}};
+bool touchMapRequested=false;
+float touchPanX=0,touchPanY=0;
+std::array<AndroidTouch::Control,10> TouchLayout() {
+    auto size=GFX::Engine.GetScreenSize();
+    return AndroidTouch::Layout(size.x,size.y,touchPointer,UAAndroidMapIsOpen());
 }
 void TouchAxes(float &lx,float &ly,float &rx,float &ry,Uint32 &buttons) {
     if(!Android::TouchVisible() || !touchPlaying) { fingers.clear(); touchPressedLatch=0; releaseTouchMouse=manualTouchHeld; return; }
@@ -105,7 +104,8 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
     if (playing && !wasPlaying) grabbed = true;
     if (!playing) grabbed = false;
 
-    if (pressed(SDL_CONTROLLER_BUTTON_START)) grabbed = false;
+    if (pressed(SDL_CONTROLLER_BUTTON_START) || touchMapRequested) grabbed = false;
+    touchMapRequested=false;
     const bool pointer = !playing || !grabbed;
     const Uint32 now = SDL_GetTicks();
     const float dt = lastTick ? std::min((now - lastTick) / 1000.0f, 0.05f) : 0.0f;
@@ -115,6 +115,11 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
     r1Pressed = pressed(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
     moveX = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_LEFTX)+touchLX));
     moveY = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_LEFTY)+touchLY));
+    touchPanX=touchPanY=0;
+    if (playing && !grabbed && UAAndroidMapIsOpen()) {
+        touchPanX=touchRX; touchPanY=touchRY;
+        touchRX=touchRY=0; // Touch pan never also turns the vehicle/camera.
+    }
     lookX = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_RIGHTX)+touchRX));
     lookY = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_RIGHTY)+touchRY));
     if (pointer && (moveX || moveY)) {
@@ -167,7 +172,7 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
 void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed)
 {
     if (r1Pressed) r1Map = !grabbed && UAAndroidMapIsTarget(input->ClickInf) ? input->ClickInf.selected_btn : nullptr;
-    auto gesture = r1Gesture.Update(playing && (pad || Android::TouchVisible()), r1Held,
+    auto gesture = r1Gesture.Update(playing && (pad || Android::TouchVisible()) && !touchPanX && !touchPanY, r1Held,
         !grabbed && UAAndroidMapIsTarget(input->ClickInf), UAAndroidMapIsOpen(),
         _mPos.x, _mPos.y, lookX, lookY, frameDt, SDL_GetTicks());
     if (gesture.toggle) {
@@ -188,6 +193,8 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
         if (gesture.up) input->ClickInf.flag |= TClickBoxInf::FLAG_RM_UP;
     }
     touchPointer=!grabbed;
+    if (playing && !grabbed && Android::TouchVisible() && (touchPanX || touchPanY))
+        UAAndroidPanMap(touchPanX*220.0f*frameDt,touchPanY*220.0f*frameDt);
     if (!playing || (!pad && !Android::TouchVisible())) return;
     // Disable desktop joystick expressions; those assume a flight-stick throttle.
     for (int i = 12; i <= 16; ++i) input->Sliders[i] = 0;
@@ -223,6 +230,7 @@ bool NC_STACK_winp::AndroidTouchEvent(SDL_Event *event)
             if(dx*dx+dy*dy <= layout[i].r*layout[i].r) {control=i; break;}
         }
         fingers[id]={control,float(p.x),float(p.y)};
+        if(control==5) touchMapRequested=true;
         if(control>=2) {
             static const int mapping[]={-1,-1,SDL_CONTROLLER_BUTTON_A,SDL_CONTROLLER_BUTTON_B,
                 SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_BACK,SDL_CONTROLLER_BUTTON_START,
