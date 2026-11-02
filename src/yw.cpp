@@ -2636,6 +2636,9 @@ bool NC_STACK_ypaworld::CreateTitleControls(){
         _GameShell->titel_button->Disable(&v228);
     }
 
+#ifdef __ANDROID__
+    _GameShell->titel_button->Remove(UIWidgets::MAIN_MENU_WIDGET_IDS::BTN_LANGUAGE);
+#endif
     _GameShell->titel_button->HideScreen();
     return true;
 }
@@ -6829,6 +6832,12 @@ void NC_STACK_ypaworld::setYW_userVehicle(NC_STACK_ypabact *bact)
             _prevUnitId = oldpBact->_gid;
 
         _userUnit = bact;
+#ifdef __ANDROID__
+        // Taking control of a vehicle should immediately make the sticks drive/aim.
+        // Returning to the host keeps its existing command/pointer behaviour.
+        if(oldpBact && bact != _userRobo && bact->_status != BACT_STATUS_DEAD)
+            _mouseGrabbed = true;
+#endif
 
         _vehicleTakenControlTimestamp = _timeStamp;
         _vehicleTakenCommandId = _userUnit->_commandID;

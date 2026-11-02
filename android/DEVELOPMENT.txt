@@ -246,3 +246,23 @@ logs pause/resume at identical game time 277224. OpenAL confirms audio device
 pause/resume; resumed mission renders normally. No global screen/lock settings
 changed. APK updated in place, saved preferences retained.
 User can now connect RG477V for same APK update and sleep regression testing.
+
+2026-11-02 Mirrored firing controls and automatic interaction modes
+Android title menu now removes the language selector; English assets/current
+English profile remain in use. Touch Move and Look pads stay fixed; Fire/Alt
+move to the left and Mode to the right beside Look (mirrored around screen).
+In ypaworld input preprocessing, a click on an actual bzda HUD button switches
+from captured Look mode to pointer mode before capture clears click flags, so
+the same tap activates its button. This also works with overlay hidden.
+Central setYW_userVehicle enables captured Look mode when control changes from
+an existing unit to a live non-host vehicle. Host return retains pointer mode.
+
+Android build, touch layout clearance/hit tests and Windows build passed.
+Installed latest shared APK in place on RG477V. Verified English title menu
+without language button, mirrored touch screenshot, direct HUD map tap from
+Move/Look opening map and showing Cursor/Pan, and take-control HUD action plus
+friendly vehicle selection changing to Move/Look and vehicle cockpit view.
+Home/resume logs identical game time 1493496 and OpenAL pause/resume.
+Temporarily enabled touch overlay for checks; restored original cfg afterwards:
+Automatic layout, Large UI, 60 FPS, Touch Hide, FPS On, touch opacity 27%.
+No mission progress saved. Pixel awaits reconnection for same APK update.

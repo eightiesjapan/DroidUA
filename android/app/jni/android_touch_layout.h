@@ -8,8 +8,8 @@ inline std::array<Control,5> Layout(float w,float h,bool pointer,bool mapOpen) {
 
     return {{{70,h-90,48,pointer ? "Cursor" : "Move"},
         {w-70,h-90,48,pointer && mapOpen ? "Pan" : "Look"},
-        {w-55,h-180,25,"Fire"},{w-120,h-155,25,"Alt"},
-        {160,h-65,25,"Mode"}}};
+        {55,h-180,25,"Fire"},{120,h-155,25,"Alt"},
+        {w-160,h-65,25,"Mode"}}};
 }
 inline int HitTest(const std::array<Control,5> &controls,float x,float y,bool visible) {
     if (!visible) return -1;

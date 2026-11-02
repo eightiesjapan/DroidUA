@@ -11106,6 +11106,15 @@ void NC_STACK_ypaworld::ypaworld_func64__sub1(TInputState *inpt)
         _fireBtnIsDown = false;
     }
 
+#ifdef __ANDROID__
+    // Keep the original HUD directly tappable while sticks aim the vehicle.
+    // Switch before capture strips the button's click flags.
+    if(_mouseGrabbed && winp->selected_btn==&bzda && winp->selected_btnID>=0 &&
+       (winp->flag & (TClickBoxInf::FLAG_BTN_DOWN | TClickBoxInf::FLAG_BTN_UP))) {
+        _mouseGrabbed=false;
+        SDL_Log("OpenUA HUD click entered pointer mode");
+    }
+#endif
     if ( _userUnit->_status == BACT_STATUS_DEAD )
     {
         _mouseGrabbed = false;
