@@ -168,3 +168,14 @@ centre in Standard/Large/wide layouts. Android and Windows builds pass. Installe
 APK in place on RG477V and verified chooser is unobstructed, direct vehicle
 selection restores overlay, and Back cancellation restores overlay. Settings
 retained (Automatic, Large, 60 FPS, Touch Show, FPS On).
+
+2026-11-02 Touch opacity preference
+Added native Options-page slider with numeric opacity percentage, range 10-100
+(near invisible to solid), default 75 for older installations with no saved key.
+Buttons, pad knobs, outlines and text follow the chosen opacity; hit targets and
+Touch Auto/Show/Hide remain independent. Reuses the original slider widget and
+OK/Cancel draft handling. Saved key touchOpacity accepts only 10..100.
+Validation: Android build passed; installed in place on RG477V. Dragged slider,
+saved low opacity and verified faint controls in Training 2, then 100 and verified
+solid controls. Restart retained preference; Cancel discarded a changed draft.
+Restored approximately the previous 75% appearance, other preferences unchanged.

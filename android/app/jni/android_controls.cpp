@@ -281,20 +281,21 @@ void NC_STACK_winp::AndroidDrawTouchControls(SDL_Surface *screen)
         }
     };
     auto layout=TouchLayout();
+    const Uint8 alpha=Uint8(Android::TouchOpacity()*255/100);
     for(int i=0;i<int(layout.size());++i) {
         bool held=false; float x=layout[i].x,y=layout[i].y;
         for(const auto &f:fingers) if(f.second.control==i) {held=true;x=f.second.x;y=f.second.y;}
         auto c=layout[i];
-        circle(int(c.x),int(c.y),int(c.r),SDL_MapRGBA(screen->format,140,200,210,190));
-        circle(int(c.x),int(c.y),int(c.r)-2,SDL_MapRGBA(screen->format,held?45:12,held?90:30,held?100:40,185));
+        circle(int(c.x),int(c.y),int(c.r),SDL_MapRGBA(screen->format,140,200,210,alpha));
+        circle(int(c.x),int(c.y),int(c.r)-2,SDL_MapRGBA(screen->format,held?45:12,held?90:30,held?100:40,alpha));
         if(i<2 && held) {
             float dx=x-c.x,dy=y-c.y,length=std::sqrt(dx*dx+dy*dy);
             if(length>c.r*.65f) {dx*=c.r*.65f/length;dy*=c.r*.65f/length;}
-            circle(int(c.x+dx),int(c.y+dy),12,SDL_MapRGBA(screen->format,100,200,220,210));
+            circle(int(c.x+dx),int(c.y+dy),12,SDL_MapRGBA(screen->format,100,200,220,alpha));
         }
         auto &text=labels[c.label];
         if(!text && font) text.reset(TTF_RenderUTF8_Blended(font.get(),c.label,SDL_Color{235,250,255,255}),SDL_FreeSurface);
-        if(text) {SDL_Rect dst{int(c.x)-text->w/2,int(c.y)-text->h/2,0,0}; SDL_BlitSurface(text.get(),nullptr,screen,&dst);}
+        if(text) {SDL_SetSurfaceAlphaMod(text.get(),alpha); SDL_Rect dst{int(c.x)-text->w/2,int(c.y)-text->h/2,0,0}; SDL_BlitSurface(text.get(),nullptr,screen,&dst);}
     }
 }
 #endif

@@ -5,7 +5,7 @@
 #include <SDL2/SDL.h>
 class NC_STACK_button;
 namespace Android {
-struct Settings { int layout=0, large=0, fps=60, touch=0, showFPS=0; };
+struct Settings { int layout=0, large=0, fps=60, touch=0, showFPS=0, touchOpacity=75; };
 void LoadSettings();
 void BeginSettings(NC_STACK_button *menu);
 bool CycleSetting(int event, NC_STACK_button *menu);
@@ -14,6 +14,7 @@ void ConfigureMenu(NC_STACK_button *menu);
 void SetMission(bool mission);
 bool InMission();
 int FrameRate();
+int TouchOpacity();
 bool TouchEnabled();
 // Rendering and overlay hit targets are suspended while the unit chooser is open.
 bool TouchVisible();
