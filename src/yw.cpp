@@ -4,6 +4,7 @@
 #include <string>
 #include "includes.h"
 #include "yw.h"
+#include "system/android_display.h"
 
 #include "yw_internal.h"
 #include "loaders.h"
@@ -3876,6 +3877,9 @@ bool NC_STACK_ypaworld::CreateVideoControls()
     _GameShell->video_button->SetState(&v229);
 
 
+#ifdef __ANDROID__
+    Android::ConfigureMenu(_GameShell->video_button);
+#endif
     _GameShell->video_button->HideScreen();
     return true;
 }
@@ -6451,12 +6455,19 @@ bool NC_STACK_ypaworld::ReloadInput(size_t id)
 
 size_t NC_STACK_ypaworld::SetGameShellVideoMode(bool windowed)
 {
+#ifdef __ANDROID__
+    Android::SetMission(false);
+#endif
     UserData *usr = _GameShell;
     
     if (System::IniConf::MenuWindowed.Get<bool>())
         windowed = true;
 
-    if ( _shellGfxMode == GFX::Engine.GetGfxMode() && windowed == GFX::Engine.GetGfxMode().windowed )
+    if ( _shellGfxMode == GFX::Engine.GetGfxMode() && windowed == GFX::Engine.GetGfxMode().windowed
+#ifdef __ANDROID__
+        && Android::LogicalSize() == GFX::Engine.GetScreenSize()
+#endif
+       )
         return 1;
 
     int v6;

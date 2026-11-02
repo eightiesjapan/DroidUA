@@ -1,6 +1,7 @@
 #ifdef __ANDROID__
 #include "winp.h"
 #include "android_pointer_gesture.h"
+#include "system/android_display.h"
 
 bool UAAndroidMapIsTarget(const TClickBoxInf &input);
 bool UAAndroidMapIsOpen();
@@ -10,6 +11,41 @@ bool UAAndroidMapIsOpen();
 #include <cmath>
 
 namespace {
+struct TouchFinger { int control; float x,y; };
+std::map<SDL_FingerID,TouchFinger> fingers;
+bool touchPlaying=false, touchPointer=false, manualTouchHeld=false, releaseTouchMouse=false;
+Uint32 currentButtons=0, touchPressedLatch=0;
+struct TouchControl { float x,y,r; const char *label; };
+std::array<TouchControl,10> TouchLayout() {
+    auto size=GFX::Engine.GetScreenSize(); float w=size.x,h=size.y;
+    return {{{70,h-90,48,touchPointer ? "Cursor" : "Move"},{w-70,h-90,48,"Look"},
+        {w-55,h-180,25,"Fire"},{w-120,h-155,25,"Alt"},
+        {w/2-90,h-32,25,"Mode"},{w/2-30,h-32,25,"Map"},
+        {w/2+90,h-32,25,"Menu"},{w/2+30,h-32,25,"Click"},
+        {140,h-165,25,"Next"},{195,h-130,25,"Host"}}};
+}
+void TouchAxes(float &lx,float &ly,float &rx,float &ry,Uint32 &buttons) {
+    if(!Android::TouchVisible() || !touchPlaying) { fingers.clear(); touchPressedLatch=0; releaseTouchMouse=manualTouchHeld; return; }
+    auto layout=TouchLayout();
+    buttons |= touchPressedLatch;
+    touchPressedLatch=0;
+    const int mapping[]={-1,-1,SDL_CONTROLLER_BUTTON_A,SDL_CONTROLLER_BUTTON_B,
+        SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_BACK,
+        SDL_CONTROLLER_BUTTON_START,SDL_CONTROLLER_BUTTON_LEFTSHOULDER,
+        SDL_CONTROLLER_BUTTON_X,SDL_CONTROLLER_BUTTON_Y};
+    for(const auto &entry:fingers) {
+        int c=entry.second.control;
+        if(c<0) continue;
+        if(c<2) {
+            float x=(entry.second.x-layout[c].x)/layout[c].r;
+            float y=(entry.second.y-layout[c].y)/layout[c].r;
+            float length=std::sqrt(x*x+y*y);
+            if(length>1) {x/=length; y/=length;}
+            if(length<.12f) x=y=0;
+            if(c==0) {lx=x; ly=y;} else {rx=x; ry=y;}
+        } else buttons |= 1u << mapping[c];
+    }
+}
 SDL_GameController *pad = nullptr;
 Uint32 previous = 0, lastTick = 0;
 std::map<int, bool> previousKeys;
@@ -21,6 +57,7 @@ bool r1Held = false, r1Pressed = false;
 ClickBox *r1Map = nullptr;
 float frameDt = 0;
 float axis(SDL_GameControllerAxis a) {
+    if (!pad) return 0;
     float v = SDL_GameControllerGetAxis(pad, a) / 32767.0f;
     const float dead = 0.18f;
     return std::fabs(v) <= dead ? 0.0f : std::copysign((std::min(std::fabs(v), 1.0f) - dead) / (1.0f - dead), v);
@@ -48,6 +85,7 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
             }
         }
     }
+    Android::SetControllerPresent(pad != nullptr);
     Uint32 buttons = 0;
     if (pad) {
         SDL_GameControllerUpdate();
@@ -57,6 +95,11 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
         if (axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 0.3f) buttons |= 1u << 24;
         if (axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 0.3f) buttons |= 1u << 25;
     }
+    touchPlaying=playing;
+    float touchLX=0,touchLY=0,touchRX=0,touchRY=0;
+    TouchAxes(touchLX,touchLY,touchRX,touchRY,buttons);
+    currentButtons=buttons;
+    if(releaseTouchMouse) { OnMouseUp(_mPos,SDL_BUTTON_LEFT,1); manualTouchHeld=false; releaseTouchMouse=false; }
     auto down = [&](int b) { return (buttons & (1u << b)) != 0; };
     auto pressed = [&](int b) { return down(b) && !(previous & (1u << b)); };
     if (playing && !wasPlaying) grabbed = true;
@@ -70,10 +113,10 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
     frameDt = dt;
     r1Held = down(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
     r1Pressed = pressed(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
-    moveX = pad ? axis(SDL_CONTROLLER_AXIS_LEFTX) : 0;
-    moveY = pad ? axis(SDL_CONTROLLER_AXIS_LEFTY) : 0;
-    lookX = pad ? axis(SDL_CONTROLLER_AXIS_RIGHTX) : 0;
-    lookY = pad ? axis(SDL_CONTROLLER_AXIS_RIGHTY) : 0;
+    moveX = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_LEFTX)+touchLX));
+    moveY = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_LEFTY)+touchLY));
+    lookX = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_RIGHTX)+touchRX));
+    lookY = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_RIGHTY)+touchRY));
     if (pointer && (moveX || moveY)) {
         static float x = 320, y = 240;
         static Common::Point last;
@@ -81,24 +124,22 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
         SDL_Surface *screen = GFX::Engine.Screen();
         x = std::max(0.0f, std::min(float(screen->w - 1), x + moveX * 420 * dt));
         y = std::max(0.0f, std::min(float(screen->h - 1), y + moveY * 420 * dt));
-        const Common::Point real = System::GetResolution();
+
         SDL_Event e = {};
         e.type = SDL_MOUSEMOTION;
-        e.motion.x = int(x * real.x / screen->w);
-        e.motion.y = int(y * real.y / screen->h);
+        e.motion.x = Android::WindowPoint(Common::Point(int(x),int(y))).x;
+        e.motion.y = Android::WindowPoint(Common::Point(int(x),int(y))).y;
         InputWatch(nullptr, &e);
         last = _mPos;
     }
     auto mouse = [&](int button, bool held, bool &old) {
         if (held != old) {
-            SDL_Surface *screen = GFX::Engine.Screen();
-            const Common::Point real = System::GetResolution();
             SDL_Event e = {};
             e.type = held ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
             e.button.button = button;
             e.button.clicks = 1;
-            e.button.x = _mPos.x * real.x / screen->w;
-            e.button.y = _mPos.y * real.y / screen->h;
+            e.button.x = Android::WindowPoint(_mPos).x;
+            e.button.y = Android::WindowPoint(_mPos).y;
             InputWatch(nullptr, &e);
             old = held;
         }
@@ -126,7 +167,7 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
 void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed)
 {
     if (r1Pressed) r1Map = !grabbed && UAAndroidMapIsTarget(input->ClickInf) ? input->ClickInf.selected_btn : nullptr;
-    auto gesture = r1Gesture.Update(playing && pad, r1Held,
+    auto gesture = r1Gesture.Update(playing && (pad || Android::TouchVisible()), r1Held,
         !grabbed && UAAndroidMapIsTarget(input->ClickInf), UAAndroidMapIsOpen(),
         _mPos.x, _mPos.y, lookX, lookY, frameDt, SDL_GetTicks());
     if (gesture.toggle) {
@@ -146,7 +187,8 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
         if (gesture.hold) input->ClickInf.flag |= TClickBoxInf::FLAG_RM_HOLD;
         if (gesture.up) input->ClickInf.flag |= TClickBoxInf::FLAG_RM_UP;
     }
-    if (!playing || !pad) return;
+    touchPointer=!grabbed;
+    if (!playing || (!pad && !Android::TouchVisible())) return;
     // Disable desktop joystick expressions; those assume a flight-stick throttle.
     for (int i = 12; i <= 16; ++i) input->Sliders[i] = 0;
     if (grabbed) {
@@ -157,8 +199,87 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
         input->Sliders[4] -= moveY;
         input->Sliders[5] -= lookY * 1.5f;
         // B/A retain the primary/secondary actions used in the first prototype.
-        if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_A) || axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 0.3f) input->Buttons.Set(0);
-        if (SDL_GameControllerGetButton(pad, SDL_CONTROLLER_BUTTON_B)) input->Buttons.Set(2);
+        if (currentButtons & ((1u << SDL_CONTROLLER_BUTTON_A) | (1u << 25))) input->Buttons.Set(0);
+        if (currentButtons & (1u << SDL_CONTROLLER_BUTTON_B)) input->Buttons.Set(2);
+    }
+}
+
+bool NC_STACK_winp::AndroidTouchEvent(SDL_Event *event)
+{
+    if(!Android::TouchVisible() || !touchPlaying) return false;
+    if((event->type==SDL_MOUSEMOTION && event->motion.which==SDL_TOUCH_MOUSEID) ||
+       ((event->type==SDL_MOUSEBUTTONDOWN || event->type==SDL_MOUSEBUTTONUP) && event->button.which==SDL_TOUCH_MOUSEID))
+        return true; // Finger events below replace SDL's single-touch mouse.
+    if(event->type!=SDL_FINGERDOWN && event->type!=SDL_FINGERMOTION && event->type!=SDL_FINGERUP) return false;
+    auto real=System::GetResolution();
+    Common::Point p=Android::LogicalPoint(Common::Point(int(event->tfinger.x*real.x),int(event->tfinger.y*real.y)));
+    auto id=event->tfinger.fingerId;
+    if(event->type==SDL_FINGERDOWN) {
+        if(!Android::InsideViewport(int(event->tfinger.x*real.x),int(event->tfinger.y*real.y))) return true;
+        int control=-1;
+        auto layout=TouchLayout();
+        for(int i=0;i<int(layout.size());++i) {
+            float dx=p.x-layout[i].x,dy=p.y-layout[i].y;
+            if(dx*dx+dy*dy <= layout[i].r*layout[i].r) {control=i; break;}
+        }
+        fingers[id]={control,float(p.x),float(p.y)};
+        if(control>=2) {
+            static const int mapping[]={-1,-1,SDL_CONTROLLER_BUTTON_A,SDL_CONTROLLER_BUTTON_B,
+                SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_BACK,SDL_CONTROLLER_BUTTON_START,
+                SDL_CONTROLLER_BUTTON_LEFTSHOULDER,SDL_CONTROLLER_BUTTON_X,SDL_CONTROLLER_BUTTON_Y};
+            touchPressedLatch |= 1u << mapping[control];
+        }
+    }
+    auto found=fingers.find(id);
+    if(found==fingers.end()) return true;
+    auto old=found->second;
+    found->second.x=p.x; found->second.y=p.y;
+    if(old.control<0) {
+        SDL_Event e={};
+        auto window=Android::WindowPoint(p);
+        if(event->type==SDL_FINGERMOTION) {
+            e.type=SDL_MOUSEMOTION; e.motion.which=SDL_TOUCH_MOUSEID-1;
+            e.motion.x=window.x; e.motion.y=window.y;
+            e.motion.xrel=p.x-int(old.x); e.motion.yrel=p.y-int(old.y);
+        } else {
+            e.type=event->type==SDL_FINGERDOWN ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+            manualTouchHeld=event->type==SDL_FINGERDOWN;
+            e.button.which=SDL_TOUCH_MOUSEID-1; e.button.button=SDL_BUTTON_LEFT; e.button.clicks=1;
+            e.button.x=window.x; e.button.y=window.y;
+            OnMouseMove(p,Common::Point());
+        }
+        InputWatch(nullptr,&e);
+    }
+    if(event->type==SDL_FINGERUP) fingers.erase(found);
+    return true;
+}
+
+void NC_STACK_winp::AndroidDrawTouchControls(SDL_Surface *screen)
+{
+    if(!Android::TouchVisible() || !touchPlaying) return;
+    static std::shared_ptr<TTF_Font> font(System::LoadFont("Liberation Sans",13),TTF_CloseFont);
+    static std::map<std::string,std::shared_ptr<SDL_Surface>> labels;
+    auto circle=[&](int cx,int cy,int radius,Uint32 color) {
+        for(int y=-radius;y<=radius;++y) {
+            int x=int(std::sqrt(float(radius*radius-y*y)));
+            SDL_Rect row{cx-x,cy+y,2*x+1,1}; SDL_FillRect(screen,&row,color);
+        }
+    };
+    auto layout=TouchLayout();
+    for(int i=0;i<int(layout.size());++i) {
+        bool held=false; float x=layout[i].x,y=layout[i].y;
+        for(const auto &f:fingers) if(f.second.control==i) {held=true;x=f.second.x;y=f.second.y;}
+        auto c=layout[i];
+        circle(int(c.x),int(c.y),int(c.r),SDL_MapRGBA(screen->format,140,200,210,190));
+        circle(int(c.x),int(c.y),int(c.r)-2,SDL_MapRGBA(screen->format,held?45:12,held?90:30,held?100:40,185));
+        if(i<2 && held) {
+            float dx=x-c.x,dy=y-c.y,length=std::sqrt(dx*dx+dy*dy);
+            if(length>c.r*.65f) {dx*=c.r*.65f/length;dy*=c.r*.65f/length;}
+            circle(int(c.x+dx),int(c.y+dy),12,SDL_MapRGBA(screen->format,100,200,220,210));
+        }
+        auto &text=labels[c.label];
+        if(!text && font) text.reset(TTF_RenderUTF8_Blended(font.get(),c.label,SDL_Color{235,250,255,255}),SDL_FreeSurface);
+        if(text) {SDL_Rect dst{int(c.x)-text->w/2,int(c.y)-text->h/2,0,0}; SDL_BlitSurface(text.get(),nullptr,screen,&dst);}
     }
 }
 #endif

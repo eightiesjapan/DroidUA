@@ -5,6 +5,7 @@
 #include "includes.h"
 #include "yw_internal.h"
 #include "yw.h"
+#include "system/android_display.h"
 #include "yw_net.h"
 #include "windp.h"
 #include "loaders.h"
@@ -209,7 +210,12 @@ int NC_STACK_ypaworld::LevelCommonLoader(TLevelDescription *mapp, int levelID, i
     /* Set hidden fractions to default world's*/
     _hiddenFractions = _worldHiddenFractions;
 
+#ifdef __ANDROID__
+    Android::SetMission(true);
+    if (true)
+#else
     if ( _gfxMode != GFX::Engine.GetGfxMode() || _GameShell->IsWindowedFlag() != GFX::Engine.GetGfxMode().windowed )
+#endif
     {
         GFX::Engine.SetResolution(_gfxMode, _GameShell->IsWindowedFlag());
 

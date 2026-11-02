@@ -3,6 +3,7 @@
 #include "nucleas.h"
 #include "system/inpt.h"
 #include "winp.h"
+#include "system/android_display.h"
 #include "utils.h"
 #include "log.h"
 #include "gui/widget.h"
@@ -226,6 +227,9 @@ void NC_STACK_winp::KeyUp(int16_t vk)
 
 int NC_STACK_winp::InputWatch(void *, SDL_Event *event)
 {
+#ifdef __ANDROID__
+    if (AndroidTouchEvent(event)) return 0;
+#endif
     switch(event->type)
     {
     case SDL_KEYDOWN:
@@ -258,6 +262,9 @@ int NC_STACK_winp::InputWatch(void *, SDL_Event *event)
 
     case SDL_MOUSEBUTTONDOWN:
     {
+#ifdef __ANDROID__
+        if (!Android::InsideViewport(event->button.x,event->button.y)) break;
+#endif
         Common::Point pos = GFX::GFXEngine::Instance.ConvertPosTo2DStuff( Common::Point(event->button.x, event->button.y) );
         if ( !Gui::Root::Instance.MouseDown(pos, event->button.button, event->button.clicks) )
             OnMouseDown(pos, event->button.button, event->button.clicks);

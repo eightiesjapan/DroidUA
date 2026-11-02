@@ -18,6 +18,7 @@
 #include "../log.h"
 #include "../font.h"
 #include "inivals.h"
+#include "android_display.h"
 #include "glfuncs.h"
 #ifdef __ANDROID__
 #include "../winp.h"
@@ -498,7 +499,10 @@ size_t GFXEngine::windd_func0(IDVList &stak)
 
 bool GFXEngine::SetResVariables(Common::Point res)
 {
-    _resolution = res;   //stak.Get<int32_t>(ATT_WIDTH, 0);
+#ifdef __ANDROID__
+    res = Android::LogicalSize();
+#endif
+    _resolution = res;
     
     _clip = _resolution - Common::Point(1, 1);
 
@@ -535,7 +539,12 @@ size_t GFXEngine::func0(IDVList &stak)
 }
 
 void GFXEngine::ApplyResolution()
-{        
+{
+#ifdef __ANDROID__
+    _corrW = (4.0f/3.0f) / (float(_resolution.x)/_resolution.y);
+    _corrH = 1.0f; _corrIW=1.0f/_corrW; _corrIH=1.0f;
+    initPolyEngine(); return;
+#endif
     if ( (float)_resolution.x / (float)_resolution.y >= 1.4 )
     {
         int half = (_resolution.x + _resolution.y) / 2;
@@ -1797,7 +1806,11 @@ void GFXEngine::BeginFrame()
     SDL_FillRect(Screen(), NULL, SDL_MapRGBA(Screen()->format, 0, 0, 0, 0) );
     
     Common::Point scrSz = System::GetResolution();
+#ifdef __ANDROID__
+    Android::SetViewport();
+#else
     glViewport(0, 0, scrSz.x, scrSz.y);
+#endif
     
     bool saved = _states.Zwrite;
     
@@ -1851,6 +1864,7 @@ void GFXEngine::EndFrame()
             SDL_BlitSurface(found->second.image.get(), nullptr, Screen(), &dest);
         }
     }
+    Android::DrawOverlay(Screen());
     SDL_ShowCursor(SDL_DISABLE);
 #endif
     DrawScreenSurface();
@@ -2169,6 +2183,7 @@ void GFXEngine::draw2DandFlush()
             SDL_BlitSurface(found->second.image.get(), nullptr, Screen(), &dest);
         }
     }
+    Android::DrawOverlay(Screen());
     SDL_ShowCursor(SDL_DISABLE);
 #endif
     DrawScreenSurface();
@@ -2320,6 +2335,9 @@ SDL_Surface * GFXEngine::ConvertSDLSurface(SDL_Surface *src, const SDL_PixelForm
 
 void GFXEngine::fpsLimitter(int value)
 {
+#ifdef __ANDROID__
+    FpsMaxTicks = 0; return; // Fractional pacing is in System::Flip.
+#endif
     if (value > 1000)
         FpsMaxTicks = 0;
     else if (value <= 0)
@@ -3028,8 +3046,10 @@ int GFXEngine::GetGfxModeIndex(const Common::Point &res)
 
 void GFXEngine::SetResolution(const Common::Point &res, bool windowed)
 {
+#ifndef __ANDROID__
     if (GfxSelectedMode == res && GfxSelectedMode.windowed == windowed)
         return;
+#endif
     
     UA_PALETTE *screen_palette = GetPalette();
 
@@ -3074,9 +3094,9 @@ void GFXEngine::SetResolution(const Common::Point &res, bool windowed)
     }
     
 #ifdef __ANDROID__
-    // Keep the original interface at 640x480; scale it to the physical viewport.
-    picked.w = 640;
-    picked.h = 480;
+    // Scale the logical interface independently from the native display.
+    Common::Point logical = Android::LogicalSize();
+    picked.w = logical.x; picked.h = logical.y;
 #endif
     if (!picked.windowed)
         System::SetVideoMode(Common::Point(picked.w, picked.h), SDL_WINDOW_FULLSCREEN_DESKTOP, &picked.mode);
@@ -3939,7 +3959,11 @@ void GFXEngine::DrawScreenSurface()
     GfxStates save = _states;
     
     Common::Point scrSz = System::GetResolution();
+#ifdef __ANDROID__
+    Android::SetViewport();
+#else
     glViewport(0, 0, scrSz.x, scrSz.y);
+#endif
     
     SetProjectionMatrix( mat4x4f() );
     SetModelViewMatrix( mat4x4f() );
@@ -4034,7 +4058,11 @@ void GFXEngine::DrawFBO()
     GfxStates save = _states;
     
     Common::Point scrSz = System::GetResolution();
+#ifdef __ANDROID__
+    Android::SetViewport();
+#else
     glViewport(0, 0, scrSz.x, scrSz.y);
+#endif
         
     SetProjectionMatrix( mat4x4f() );
     SetModelViewMatrix( mat4x4f() );
@@ -4180,6 +4208,9 @@ float GFXEngine::GetColorEffectPower(int id)
 
 Common::Point GFXEngine::ConvertPosTo2DStuff(const Common::Point &pos)
 {
+#ifdef __ANDROID__
+    return Android::LogicalPoint(pos);
+#endif
     Common::Point real = System::GetResolution();
 
     if (real == _resolution)

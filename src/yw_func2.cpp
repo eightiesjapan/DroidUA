@@ -3,6 +3,7 @@
 
 #include "includes.h"
 #include "yw.h"
+#include "system/android_display.h"
 #include "yw_internal.h"
 #include "font.h"
 #include "button.h"
@@ -1082,6 +1083,9 @@ void UserData::sb_0x46aa8c()
         forceChange = true;
     }
 
+#ifdef __ANDROID__
+    forceChange = Android::ApplySettings() || forceChange;
+#endif
     if ( forceChange )
     {
         yw->SetGameShellVideoMode( IsWindowedFlag() );
@@ -1482,6 +1486,9 @@ void UserData::ShowToolTip(int id)
 // Go to options menu
 void UserData::ShowOptionsMenu()
 {
+#ifdef __ANDROID__
+    Android::BeginSettings(video_button);
+#endif
     titel_button->HideScreen();
 
     video_button->ShowScreen();
@@ -2807,6 +2814,10 @@ void UserData::GameShellUiHandleInput()
         if ( r.btn )
             ShowToolTip(r.btn);
 
+#ifdef __ANDROID__
+        if (Android::CycleSetting(r.code,video_button)) {}
+        else
+#endif
         if ( r.code == 1100 )
         {
             p_YW->GuiWinOpen( &video_listvw );

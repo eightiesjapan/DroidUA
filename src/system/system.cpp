@@ -8,6 +8,7 @@
 #include "../fmtlib/printf.h"
 
 #include "system.h"
+#include "android_display.h"
 #include "fsmgr.h"
 #include "../utils.h"
 
@@ -252,7 +253,11 @@ void Init(bool oldGL)
 
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
-    window = SDL_CreateWindow("OpenUA (Urban Assault)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, winRes.W, winRes.H, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
+    window = SDL_CreateWindow("OpenUA (Urban Assault)", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, winRes.W, winRes.H, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL
+#ifdef __ANDROID__
+        | SDL_WINDOW_FULLSCREEN_DESKTOP
+#endif
+    );
 
     if (!window)
     {
@@ -271,6 +276,11 @@ void Init(bool oldGL)
     SDL_Log("OpenUA GL: %s / %s", glGetString(GL_VENDOR), glGetString(GL_VERSION));
 #endif
 
+#ifdef __ANDROID__
+    int dw=0,dh=0; SDL_GL_GetDrawableSize(window,&dw,&dh); winRes.Set(dw,dh);
+    Android::LoadSettings();
+    SDL_DisableScreenSaver();
+#endif
     TTF_Init();
 
     ScanFonts();
@@ -358,7 +368,7 @@ void Flip()
     // The desktop 1000/60 integer timer actually permits about 62 FPS.
     // A fractional deadline keeps this prototype at 60 on 120 Hz displays too.
     const Uint64 frequency = SDL_GetPerformanceFrequency();
-    const Uint64 period = frequency / 60;
+    const Uint64 period = frequency / Android::FrameRate();
     static Uint64 deadline = SDL_GetPerformanceCounter();
     Uint64 tick = SDL_GetPerformanceCounter();
     if (tick > deadline + period) deadline = tick;
@@ -374,8 +384,13 @@ void Flip()
     static Uint32 sampleStart = SDL_GetTicks(), frames = 0;
     ++frames;
     const Uint32 now = SDL_GetTicks();
-    if (now - sampleStart >= 5000) {
-        SDL_Log("OpenUA rendered FPS: %.1f over %.1f seconds", frames * 1000.0f / (now - sampleStart), (now - sampleStart) / 1000.0f);
+    if (now - sampleStart >= 1000) {
+        static Uint32 logAt=0;
+        if (now >= logAt) {
+            SDL_Log("OpenUA rendered FPS: %.1f over %.1f seconds", frames * 1000.0f / (now - sampleStart), (now - sampleStart) / 1000.0f);
+            logAt=now+5000;
+        }
+        Android::ReportFPS(frames * 1000.0f / (now - sampleStart));
         frames = 0;
         sampleStart = now;
     }
@@ -384,6 +399,11 @@ void Flip()
 
 void SetVideoMode(const Common::Point &sz, uint32_t full, SDL_DisplayMode *mode)
 {
+#ifdef __ANDROID__
+    SDL_SetWindowFullscreen(window,SDL_WINDOW_FULLSCREEN_DESKTOP);
+    int w=0,h=0; SDL_GL_GetDrawableSize(window,&w,&h); winRes.Set(w,h);
+    return;
+#endif
     if (window)
     {
         SDL_SetWindowFullscreen(window, full);

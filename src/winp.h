@@ -41,6 +41,8 @@ public:
     static void InitFirst();
 #ifdef __ANDROID__
     static void AndroidPoll(bool playing, bool &grabbed);
+    static bool AndroidTouchEvent(SDL_Event *event);
+    static void AndroidDrawTouchControls(SDL_Surface *screen);
     static void AndroidApply(TInputState *input, bool playing, bool &grabbed);
     static Common::Point AndroidPointer() { return _mPos; }
 #endif

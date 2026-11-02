@@ -88,3 +88,46 @@ drag, screen-edge continuation, outside-map capture rejection, long hold,
 map closure and mission/disconnect cancellation. Android and Windows builds pass.
 Updated APK installed with install-r, preserving data. Physical pan speed/direction
 and map + unit selection regression require handheld play test.
+
+2026-11-02 Adaptive Android display and in-game Options milestone
+Options now replaces desktop resolution/device, windowed, software-cursor and
+16-bit texture choices with five Android settings. Original sound, music, stereo,
+visibility, sky, enemy indicators and explosion controls remain available.
+- Screen layout Automatic: original 4:3 menus/briefings with side bars on wide
+  screens; native-aspect gameplay with expanded horizontal view. Original 4:3:
+  proportional 4:3 gameplay with side bars on wider displays.
+- Interface Standard: logical height 480; Large: logical height 400 (~20% larger
+  text/widgets). Logical width follows viewport aspect, while 3D renders at native
+  drawable resolution. Vertical field of view preserved by aspect correction.
+- Frame rate 60 (default) or 30, fractionally paced, no 120/unlimited setting.
+- Touch controls Automatic (hidden when SDL game controller is connected), Show,
+  Hide. Multi-finger Move/Cursor and Look pads, Fire/Alt, Mode, Map, Click, Menu,
+  Next and Host buttons. Mode shares R1 click-versus-map-drag behaviour. Direct
+  world/HUD touch remains usable; handled touch events do not also click through.
+  Brief taps are latched for at least one input frame.
+- Show FPS Off/On; rendered FPS measured each second, diagnostic log every 5 sec.
+New settings use app-private game/android-settings.cfg; OK saves atomically and
+Cancel discards drafts. Settings survive restart and are independent of profiles.
+Android owns the fullscreen native surface. A shared viewport transform is used
+for graphics, touch, mouse and controller pointer; black-bar presses are ignored.
+Cutout/system-bar safe insets are read from the Activity; invalid insets clamped.
+Screen saver suppressed while game is active. No global device sleep setting changed.
+
+Validation:
+- Android and Windows builds pass; standalone display geometry/safe-inset/pointer
+  tests and existing R1 gesture tests pass.
+- On RG477V, visually verified Standard and Large Options, changed all choices,
+  Cancel did not save, OK persisted across restart; actual 30 and 60 FPS observed.
+- Entered Training Mission 2; verified overlay rendering and touch Map and Mode
+  actions (including Mode log/pointer transition).
+- Temporarily used Android display override 1920x1080: verified proportional 4:3
+  menus, full-width Automatic mission and pillarboxed Original 4:3 mission.
+  Automatic touch controls hidden with attached built-in controller.
+  Override restored to physical 1280x960 in finally blocks.
+- Installed via adb install -r, preserving game data. Restored user-facing default
+  Automatic/Standard/60/Automatic/FPS Off and left Options page open.
+Remaining validation: real Pixel installation with separate game-data copy, real
+cutout/navigation-inset behaviour, simultaneous multi-touch and longer phone play,
+longer campaigns/vehicle physics at 30 FPS. Current landscape orientation remains
+fixed; foldables/multi-window resize during a mission are not yet validated.
+Movies, game-data importer and Bluetooth mouse hardware validation remain separate.
