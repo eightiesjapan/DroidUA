@@ -24,7 +24,7 @@ std::array<AndroidTouch::Control,5> TouchLayout() {
     return AndroidTouch::Layout(size.x,size.y,touchPointer,UAAndroidMapIsOpen());
 }
 void TouchAxes(float &lx,float &ly,float &rx,float &ry,Uint32 &buttons) {
-    if(!Android::TouchEnabled() || !touchPlaying) {
+    if(!touchPlaying) {
         fingers.clear(); touchPressedLatch=0; releaseTouchMouse=manualTouchHeld; return;
     }
     if(!Android::TouchVisible()) {
@@ -236,7 +236,9 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
 
 bool NC_STACK_winp::AndroidTouchEvent(SDL_Event *event)
 {
-    if(!Android::TouchEnabled() || !touchPlaying) return false;
+    // Direct fingers must use absolute positions even with Touch Hide/Auto on a
+    // handheld. SDL's synthetic mouse may be relative/warped while aiming.
+    if(!touchPlaying) return false;
     if((event->type==SDL_MOUSEMOTION && event->motion.which==SDL_TOUCH_MOUSEID) ||
        ((event->type==SDL_MOUSEBUTTONDOWN || event->type==SDL_MOUSEBUTTONUP) && event->button.which==SDL_TOUCH_MOUSEID))
         return true; // Finger events below replace SDL's single-touch mouse.
@@ -305,7 +307,14 @@ void NC_STACK_winp::AndroidDrawTouchControls(SDL_Surface *screen)
         }
         auto &text=labels[c.label];
         if(!text && font) text.reset(TTF_RenderUTF8_Blended(font.get(),c.label,SDL_Color{235,250,255,255}),SDL_FreeSurface);
-        if(text) {SDL_SetSurfaceAlphaMod(text.get(),alpha); SDL_Rect dst{int(c.x)-text->w/2,int(c.y)-text->h/2,0,0}; SDL_BlitSurface(text.get(),nullptr,screen,&dst);}
+        if(text) {
+            SDL_SetSurfaceAlphaMod(text.get(),alpha);
+            // Fit SELECT inside the existing compact button without stretching.
+            int width=std::min(text->w,int(c.r*1.65f));
+            int height=text->h*width/std::max(text->w,1);
+            SDL_Rect dst{int(c.x)-width/2,int(c.y)-height/2,width,height};
+            SDL_BlitScaled(text.get(),nullptr,screen,&dst);
+        }
     }
 }
 #endif

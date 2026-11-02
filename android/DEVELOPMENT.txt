@@ -266,3 +266,23 @@ Home/resume logs identical game time 1493496 and OpenAL pause/resume.
 Temporarily enabled touch overlay for checks; restored original cfg afterwards:
 Automatic layout, Large UI, 60 FPS, Touch Hide, FPS On, touch opacity 27%.
 No mission progress saved. Pixel awaits reconnection for same APK update.
+
+2026-11-02 Hidden-overlay HUD touch consistency and VIEW/SELECT labels
+Investigation: AndroidTouchEvent previously returned early when TouchEnabled was
+false (Touch Hide, or Auto with gamepad). Thus RG477V used SDL synthetic mouse
+coordinates while Pixel with visible controls used explicit absolute fingers.
+Relative aiming/cursor warps can leave the hidden-overlay mouse position stale
+across host/menu/control changes. Now all mission fingers use the same absolute
+translation and suppress duplicate SDL touch-mouse events independently of overlay
+visibility. TouchAxes clears all fingers only outside gameplay; hidden overlays
+remove control fingers but retain direct gestures through release.
+
+Mode label now describes next action: VIEW in pointer mode, SELECT in look mode.
+Text is proportionally fitted into the existing circle, preserving hit geometry.
+Tests check both labels and existing handheld/phone layout clearance/hit targets.
+Android build passed. Updated RG477V in place, verified hidden-overlay HUD tap
+enters pointer mode/opens map. Temporarily showed controls for screenshots of both
+labels and a toggle; restored Touch Hide and 27% opacity, other prefs unchanged.
+User should repeat original physical vehicle -> START/base -> look -> HUD tap
+sequence for confirmation; that exact physical sequence was not reproduced with
+all hardware presses in this pass. Phone update awaits reconnection.

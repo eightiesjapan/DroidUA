@@ -19,6 +19,8 @@ int main() {
             assert(AndroidTouch::HitTest(controls,controls[i].x,controls[i].y,true)==int(i));
             assert(AndroidTouch::HitTest(controls,controls[i].x,controls[i].y,false)==-1);
         }
+        assert(std::strcmp(controls[4].label,"VIEW")==0);
+        assert(std::strcmp(AndroidTouch::Layout(size[0],size[1],false,true)[4].label,"SELECT")==0);
         assert(std::strcmp(controls[1].label,"Pan")==0);
         assert(std::strcmp(AndroidTouch::Layout(size[0],size[1],false,true)[1].label,"Look")==0);
         assert(std::strcmp(AndroidTouch::Layout(size[0],size[1],true,false)[1].label,"Look")==0);
