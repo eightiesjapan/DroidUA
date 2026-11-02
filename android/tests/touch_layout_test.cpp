@@ -14,6 +14,11 @@ int main() {
             float x=controls[i].x-controls[j].x,y=controls[i].y-controls[j].y;
             assert(std::sqrt(x*x+y*y)>controls[i].r+controls[j].r);
         }
+        // Hidden controls must not steal a tap from a chooser underneath them.
+        for(unsigned i=0;i<controls.size();++i) {
+            assert(AndroidTouch::HitTest(controls,controls[i].x,controls[i].y,true)==int(i));
+            assert(AndroidTouch::HitTest(controls,controls[i].x,controls[i].y,false)==-1);
+        }
         assert(std::strcmp(controls[1].label,"Pan")==0);
         assert(std::strcmp(AndroidTouch::Layout(size[0],size[1],false,true)[1].label,"Look")==0);
         assert(std::strcmp(AndroidTouch::Layout(size[0],size[1],true,false)[1].label,"Look")==0);

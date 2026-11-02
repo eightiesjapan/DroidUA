@@ -14,6 +14,8 @@ void ConfigureMenu(NC_STACK_button *menu);
 void SetMission(bool mission);
 bool InMission();
 int FrameRate();
+bool TouchEnabled();
+// Rendering and overlay hit targets are suspended while the unit chooser is open.
 bool TouchVisible();
 void SetControllerPresent(bool present);
 SDL_Rect Viewport();

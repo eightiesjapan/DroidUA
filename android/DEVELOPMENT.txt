@@ -155,3 +155,16 @@ Pan moves map contents without camera movement, and direct dragging of the blue
 map title bar repositions the entire map window. User preferences retained:
 Automatic layout, Large UI, 60 FPS, Touch Show, FPS On. APK updated in place.
 Pixel 9a hardware test still pending connection; needs APK plus private game data.
+
+2026-11-02 Unit chooser touch overlay visibility
+The native vehicle/building chooser now suppresses touch overlay drawing and hit
+circles while open. Selecting a vehicle or cancelling restores the overlay from
+actual chooser state, without changing saved Touch Auto/Show/Hide preferences.
+Hidden controls stop held pad/button inputs; direct menu fingers remain tracked
+through release so visibility transitions do not swallow a selection release.
+Physical gamepad input remains available while the chooser is open.
+Validation: layout tests include visible/hidden hit targets at every button
+centre in Standard/Large/wide layouts. Android and Windows builds pass. Installed
+APK in place on RG477V and verified chooser is unobstructed, direct vehicle
+selection restores overlay, and Back cancellation restores overlay. Settings
+retained (Automatic, Large, 60 FPS, Touch Show, FPS On).

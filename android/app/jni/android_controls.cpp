@@ -24,7 +24,19 @@ std::array<AndroidTouch::Control,10> TouchLayout() {
     return AndroidTouch::Layout(size.x,size.y,touchPointer,UAAndroidMapIsOpen());
 }
 void TouchAxes(float &lx,float &ly,float &rx,float &ry,Uint32 &buttons) {
-    if(!Android::TouchVisible() || !touchPlaying) { fingers.clear(); touchPressedLatch=0; releaseTouchMouse=manualTouchHeld; return; }
+    if(!Android::TouchEnabled() || !touchPlaying) {
+        fingers.clear(); touchPressedLatch=0; releaseTouchMouse=manualTouchHeld; return;
+    }
+    if(!Android::TouchVisible()) {
+        // Stop held overlay pads/buttons, but retain direct menu touches through
+        // their release. Changing visibility must not turn a held pad into a click.
+        for(auto it=fingers.begin();it!=fingers.end();) {
+            if(it->second.control>=0) it=fingers.erase(it); else ++it;
+        }
+        touchPressedLatch=0;
+        touchMapRequested=false;
+        return;
+    }
     auto layout=TouchLayout();
     buttons |= touchPressedLatch;
     touchPressedLatch=0;
@@ -213,7 +225,7 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
 
 bool NC_STACK_winp::AndroidTouchEvent(SDL_Event *event)
 {
-    if(!Android::TouchVisible() || !touchPlaying) return false;
+    if(!Android::TouchEnabled() || !touchPlaying) return false;
     if((event->type==SDL_MOUSEMOTION && event->motion.which==SDL_TOUCH_MOUSEID) ||
        ((event->type==SDL_MOUSEBUTTONDOWN || event->type==SDL_MOUSEBUTTONUP) && event->button.which==SDL_TOUCH_MOUSEID))
         return true; // Finger events below replace SDL's single-touch mouse.
@@ -223,12 +235,7 @@ bool NC_STACK_winp::AndroidTouchEvent(SDL_Event *event)
     auto id=event->tfinger.fingerId;
     if(event->type==SDL_FINGERDOWN) {
         if(!Android::InsideViewport(int(event->tfinger.x*real.x),int(event->tfinger.y*real.y))) return true;
-        int control=-1;
-        auto layout=TouchLayout();
-        for(int i=0;i<int(layout.size());++i) {
-            float dx=p.x-layout[i].x,dy=p.y-layout[i].y;
-            if(dx*dx+dy*dy <= layout[i].r*layout[i].r) {control=i; break;}
-        }
+        int control=AndroidTouch::HitTest(TouchLayout(),p.x,p.y,Android::TouchVisible());
         fingers[id]={control,float(p.x),float(p.y)};
         if(control==5) touchMapRequested=true;
         if(control>=2) {

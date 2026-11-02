@@ -13,5 +13,13 @@ inline std::array<Control,10> Layout(float w,float h,bool pointer,bool mapOpen) 
         {w/2+90,row,25,"Menu"},{w/2+30,row,25,"Click"},
         {140,h-165,25,"Next"},{195,h-130,25,"Host"}}};
 }
+inline int HitTest(const std::array<Control,10> &controls,float x,float y,bool visible) {
+    if (!visible) return -1;
+    for (unsigned i=0;i<controls.size();++i) {
+        const float dx=x-controls[i].x,dy=y-controls[i].y;
+        if (dx*dx+dy*dy <= controls[i].r*controls[i].r) return int(i);
+    }
+    return -1;
+}
 }
 #endif

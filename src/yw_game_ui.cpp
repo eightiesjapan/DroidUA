@@ -114,6 +114,12 @@ energPanel up_panel;
 
 ///////// down panel /////////
 GuiList gui_lstvw;
+#ifdef __ANDROID__
+bool UAAndroidUnitMenuIsOpen()
+{
+    return gui_lstvw.IsOpen(); // Vehicle/building chooser, including its scroll list.
+}
+#endif
 
 bzd bzda;
 

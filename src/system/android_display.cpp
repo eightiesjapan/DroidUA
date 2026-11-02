@@ -12,6 +12,8 @@
 #include <cstdio>
 #include <memory>
 
+bool UAAndroidUnitMenuIsOpen();
+
 namespace Android {
 static Settings settings, draft;
 static bool mission=false, controller=false;
@@ -118,7 +120,8 @@ void SetMission(bool value) { mission=value; }
 bool InMission() { return mission; }
 int FrameRate() { return settings.fps; }
 void SetControllerPresent(bool present) { controller=present; }
-bool TouchVisible() { return mission && (settings.touch==1 || (settings.touch==0 && !controller)); }
+bool TouchEnabled() { return mission && (settings.touch==1 || (settings.touch==0 && !controller)); }
+bool TouchVisible() { return TouchEnabled() && !UAAndroidUnitMenuIsOpen(); }
 SDL_Rect Viewport() {
     ReadInsets();
     auto size=System::GetResolution();
