@@ -41,7 +41,7 @@ public:
     static void InitFirst();
 #ifdef __ANDROID__
     static void AndroidPoll(bool playing, bool &grabbed);
-    static void AndroidApply(TInputState *input, bool playing, bool grabbed);
+    static void AndroidApply(TInputState *input, bool playing, bool &grabbed);
     static Common::Point AndroidPointer() { return _mPos; }
 #endif
     

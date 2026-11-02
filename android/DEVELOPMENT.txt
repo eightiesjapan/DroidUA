@@ -71,3 +71,20 @@ cursor mode remain pending user testing. No claim of completed gameplay QA.
 Remaining work includes adjustable controls/sensitivity, 30/60 FPS settings,
 resolution/UI scaling choices, optional touch overlay (hidden for handhelds),
 movie playback, and longer campaign/save testing.
+
+2026-11-02 R1 map-pan correction:
+User reported R1 immediately changed pointer/camera mode, preventing right-drag
+map panning. R1 now toggles only on release of a short (<300 ms), stationary click.
+Pressing R1 in pointer mode over the map body captures a drag gesture. Left-stick
+cursor movement or right-stick movement begins native map RMB dragging. Right
+stick adds an unbounded virtual drag displacement; visible pointer stays in place,
+so panning can continue past screen boundaries. Releasing after a drag never toggles.
+R1 must start over the map body; outside presses do not capture map panning.
+Long stationary holds do not toggle. Closing/minimizing map, disconnecting pad or
+leaving mission cancels gesture without toggling; release required before retry.
+L1 selection/rectangle drag and L2 native RMB mapping preserved.
+Standalone gesture tests cover deferred click, one-shot toggle, left/right-stick
+drag, screen-edge continuation, outside-map capture rejection, long hold,
+map closure and mission/disconnect cancellation. Android and Windows builds pass.
+Updated APK installed with install-r, preserving data. Physical pan speed/direction
+and map + unit selection regression require handheld play test.

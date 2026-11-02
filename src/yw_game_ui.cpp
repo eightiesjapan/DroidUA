@@ -82,6 +82,16 @@ float flt_516528;
 float flt_516530;
 
 tehMap robo_map;
+#ifdef __ANDROID__
+bool UAAndroidMapIsTarget(const TClickBoxInf &input)
+{
+    return robo_map.IsOpen() && input.selected_btn == &robo_map && input.selected_btnID == 17;
+}
+bool UAAndroidMapIsOpen()
+{
+    return robo_map.IsOpen() && !(robo_map.flags & GuiBase::FLAG_ICONIFED);
+}
+#endif
 
 typedef int (*mapFunc)(NC_STACK_ypaworld *yw, int x, int y);
 

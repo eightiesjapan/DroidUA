@@ -1,5 +1,9 @@
 #ifdef __ANDROID__
 #include "winp.h"
+#include "android_pointer_gesture.h"
+
+bool UAAndroidMapIsTarget(const TClickBoxInf &input);
+bool UAAndroidMapIsOpen();
 #include "system/gfx.h"
 #include "system/system.h"
 #include <algorithm>
@@ -12,6 +16,10 @@ std::map<int, bool> previousKeys;
 bool wasPlaying = false;
 float moveX = 0, moveY = 0, lookX = 0, lookY = 0;
 bool leftClick = false, rightClick = false;
+AndroidPointerGesture r1Gesture;
+bool r1Held = false, r1Pressed = false;
+ClickBox *r1Map = nullptr;
+float frameDt = 0;
 float axis(SDL_GameControllerAxis a) {
     float v = SDL_GameControllerGetAxis(pad, a) / 32767.0f;
     const float dead = 0.18f;
@@ -53,15 +61,15 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
     auto pressed = [&](int b) { return down(b) && !(previous & (1u << b)); };
     if (playing && !wasPlaying) grabbed = true;
     if (!playing) grabbed = false;
-    if (playing && pressed(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER)) {
-        grabbed = !grabbed;
-        SDL_Log("OpenUA controller mode: %s", grabbed ? "vehicle" : "pointer");
-    }
+
     if (pressed(SDL_CONTROLLER_BUTTON_START)) grabbed = false;
     const bool pointer = !playing || !grabbed;
     const Uint32 now = SDL_GetTicks();
     const float dt = lastTick ? std::min((now - lastTick) / 1000.0f, 0.05f) : 0.0f;
     lastTick = now;
+    frameDt = dt;
+    r1Held = down(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+    r1Pressed = pressed(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
     moveX = pad ? axis(SDL_CONTROLLER_AXIS_LEFTX) : 0;
     moveY = pad ? axis(SDL_CONTROLLER_AXIS_LEFTY) : 0;
     lookX = pad ? axis(SDL_CONTROLLER_AXIS_RIGHTX) : 0;
@@ -115,8 +123,29 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
     wasPlaying = playing;
 }
 
-void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool grabbed)
+void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed)
 {
+    if (r1Pressed) r1Map = !grabbed && UAAndroidMapIsTarget(input->ClickInf) ? input->ClickInf.selected_btn : nullptr;
+    auto gesture = r1Gesture.Update(playing && pad, r1Held,
+        !grabbed && UAAndroidMapIsTarget(input->ClickInf), UAAndroidMapIsOpen(),
+        _mPos.x, _mPos.y, lookX, lookY, frameDt, SDL_GetTicks());
+    if (gesture.toggle) {
+        grabbed = !grabbed;
+        SDL_Log("OpenUA controller mode on R1 release: %s", grabbed ? "vehicle" : "pointer");
+    }
+    if (gesture.down || gesture.hold || gesture.up) {
+        // Preserve the native map drag, including its zoom scaling and clamping.
+        // A virtual drag coordinate lets the right stick pan beyond screen edges
+        // while the visible pointer remains at its actual position.
+        input->ClickInf.move.ScreenPos = Common::Point(gesture.x, gesture.y);
+        if (r1Map) {
+            input->ClickInf.selected_btn = r1Map;
+            input->ClickInf.selected_btnID = 17;
+        }
+        if (gesture.down) input->ClickInf.flag |= TClickBoxInf::FLAG_RM_DOWN;
+        if (gesture.hold) input->ClickInf.flag |= TClickBoxInf::FLAG_RM_HOLD;
+        if (gesture.up) input->ClickInf.flag |= TClickBoxInf::FLAG_RM_UP;
+    }
     if (!playing || !pad) return;
     // Disable desktop joystick expressions; those assume a flight-stick throttle.
     for (int i = 12; i <= 16; ++i) input->Sliders[i] = 0;
