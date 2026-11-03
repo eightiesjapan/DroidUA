@@ -345,3 +345,17 @@ Home/resume during tutorial playback succeeded with existing audio suspension.
 Installed APK in place; saves and display/touch preferences retained. Hotkey
 feel and vehicle-specific brake/leader actions await user testing. Pixel not yet
 updated; its old gfx.movie_player=off also needs enabling at next deployment.
+
+2026-11-03 Map double-tap and controller double-click
+Android-generated touch and L1 mouse events previously always had clicks=1,
+so the engine never received FLAG_DBL_CLICK to enter a map vehicle. Added
+independent click recognizers for direct fingers and gamepad clicks. Short
+stationary click pairs within 350 ms emit clicks=2; drag motion (including
+out-and-back paths), long holds, distant taps and resets cancel the pairing.
+The map's Android release-position tolerance now accepts 12 logical pixels of
+finger drift; desktop retains its original <4-pixel behaviour. Existing native
+map transfer and automatic Look-on-vehicle-entry paths are reused.
+Validation: click_gesture_test passes timing, position, drag, hold, reset and
+controller cases. Android and Windows builds passed. Installed in place on
+RG477V, preserving data. User asked to verify direct map double-tap and L1
+physical double-click; hardware confirmation pending. Pixel awaits update.

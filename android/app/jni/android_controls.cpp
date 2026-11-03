@@ -1,6 +1,7 @@
 #ifdef __ANDROID__
 #include "winp.h"
 #include "android_pointer_gesture.h"
+#include "android_click_gesture.h"
 #include "android_touch_layout.h"
 #include "system/android_display.h"
 
@@ -63,6 +64,7 @@ bool wasPlaying = false;
 float moveX = 0, moveY = 0, lookX = 0, lookY = 0;
 bool leftClick = false, rightClick = false;
 AndroidPointerGesture r1Gesture;
+AndroidClickGesture touchClicks, padClicks(4);
 bool r1Held = false, r1Pressed = false;
 ClickBox *r1Map = nullptr;
 float frameDt = 0;
@@ -82,6 +84,7 @@ void NC_STACK_winp::AndroidReset()
     if(leftClick || manualTouchHeld) OnMouseUp(_mPos,SDL_BUTTON_LEFT,1);
     if(rightClick || r1Held) OnMouseUp(_mPos,SDL_BUTTON_RIGHT,1);
     leftClick=rightClick=manualTouchHeld=releaseTouchMouse=false;
+    touchClicks=AndroidClickGesture(); padClicks=AndroidClickGesture(4);
     r1Held=r1Pressed=false; r1Map=nullptr; r1Gesture=AndroidPointerGesture();
     moveX=moveY=lookX=lookY=mapPanX=mapPanY=0;
     lastTick=0;
@@ -176,12 +179,14 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
         InputWatch(nullptr, &e);
         last = _mPos;
     }
+    padClicks.Move(_mPos.x,_mPos.y);
     auto mouse = [&](int button, bool held, bool &old) {
         if (held != old) {
             SDL_Event e = {};
             e.type = held ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
             e.button.button = button;
-            e.button.clicks = 1;
+            e.button.clicks = button==SDL_BUTTON_LEFT
+                ? (held?padClicks.Down(now,_mPos.x,_mPos.y):padClicks.Up(now,_mPos.x,_mPos.y)):1;
             e.button.x = Android::WindowPoint(_mPos).x;
             e.button.y = Android::WindowPoint(_mPos).y;
             InputWatch(nullptr, &e);
@@ -285,13 +290,15 @@ bool NC_STACK_winp::AndroidTouchEvent(SDL_Event *event)
         SDL_Event e={};
         auto window=Android::WindowPoint(p);
         if(event->type==SDL_FINGERMOTION) {
+            touchClicks.Move(p.x,p.y);
             e.type=SDL_MOUSEMOTION; e.motion.which=SDL_TOUCH_MOUSEID-1;
             e.motion.x=window.x; e.motion.y=window.y;
             e.motion.xrel=p.x-int(old.x); e.motion.yrel=p.y-int(old.y);
         } else {
             e.type=event->type==SDL_FINGERDOWN ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
             manualTouchHeld=event->type==SDL_FINGERDOWN;
-            e.button.which=SDL_TOUCH_MOUSEID-1; e.button.button=SDL_BUTTON_LEFT; e.button.clicks=1;
+            e.button.which=SDL_TOUCH_MOUSEID-1; e.button.button=SDL_BUTTON_LEFT;
+            e.button.clicks=manualTouchHeld?touchClicks.Down(SDL_GetTicks(),p.x,p.y):touchClicks.Up(SDL_GetTicks(),p.x,p.y);
             e.button.x=window.x; e.button.y=window.y;
             OnMouseMove(p,Common::Point());
         }

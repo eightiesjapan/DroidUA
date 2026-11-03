@@ -10222,10 +10222,15 @@ int NC_STACK_ypaworld::ypaworld_func64__sub21__sub4(TInputState *arg, int a3)
 
 bool NC_STACK_ypaworld::ypaworld_func64__sub21__sub6(TClickBoxInf *winp)
 {
+#ifdef __ANDROID__
+    const int doubleClickSlop=12; // Match small finger drift accepted by the touch click recognizer.
+#else
+    const int doubleClickSlop=3;
+#endif
     if ( winp->flag & TClickBoxInf::FLAG_DBL_CLICK
             && _bactPrevClicked
-            && Common::ABS(winp->move.ScreenPos.x - _prevMousePos.x) < 4
-            && Common::ABS(winp->move.ScreenPos.y - _prevMousePos.y) < 4 )
+            && Common::ABS(winp->move.ScreenPos.x - _prevMousePos.x) <= doubleClickSlop
+            && Common::ABS(winp->move.ScreenPos.y - _prevMousePos.y) <= doubleClickSlop )
     {
         _prevMousePos = Common::Point();
 
