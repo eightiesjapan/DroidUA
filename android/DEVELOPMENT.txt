@@ -286,3 +286,22 @@ labels and a toggle; restored Touch Hide and 27% opacity, other prefs unchanged.
 User should repeat original physical vehicle -> START/base -> look -> HUD tap
 sequence for confirmation; that exact physical sequence was not reproduced with
 all hardware presses in this pass. Phone update awaits reconnection.
+
+2026-11-03 Direct gamepad map panning, duplicate weapon triggers and dialogs
+Physical right stick now feeds the same direct map-centre pan as touch Pan
+whenever the map is open and not minimized, in pointer or Look mode, regardless
+of pointer location. It does not also rotate the camera; closing the map restores
+normal right-stick aiming. Touch Look/Pan behaviour is retained.
+L2 now duplicates A (action 0); R2 duplicates B (action 2). L2 no longer emits a
+right mouse click. A/B remain available and R1 still toggles interaction mode.
+The common confirmation dialog and exit menu force pointer mode when opened and
+while active. Physical mouse/R1 cannot capture aim behind them. Touch controls
+hide while these dialogs are open and return on dismissal, preventing overlap.
+Validation: Android and Windows builds pass; native touch layout, R1 gesture,
+and display math tests pass. APK updated in place on RG477V; settings preserved
+(Automatic/Large/60 FPS/Touch Show/FPS Off/27% opacity). Verified Look-mode HUD
+exit tap opens pointer-mode menu without overlays, Help confirmation shows
+pointer with overlays hidden, and a direct Cancel tap dismisses it and restores
+controls. No saves written; app backgrounded after training checks. Physical
+right-stick and analog-trigger feel still require the user's hands-on test.
+Pixel has not yet received this APK.

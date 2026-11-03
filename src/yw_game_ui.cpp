@@ -83,6 +83,10 @@ float flt_516530;
 
 tehMap robo_map;
 #ifdef __ANDROID__
+bool UAAndroidModalIsOpen()
+{
+    return lstvw2.IsOpen() || exit_menu.IsOpen();
+}
 bool UAAndroidMapIsTarget(const TClickBoxInf &input)
 {
     return robo_map.IsOpen() && input.selected_btn == &robo_map && input.selected_btnID == 17;
@@ -11149,6 +11153,10 @@ void NC_STACK_ypaworld::ypaworld_func64__sub1(TInputState *inpt)
     if ( gui_lstvw.IsOpen() )
         inpt->Sliders[1] = 0;
 
+#ifdef __ANDROID__
+    // A physical mouse right-click must not capture aiming behind a dialog.
+    if (UAAndroidModalIsOpen()) _mouseGrabbed=false;
+#endif
     if ( _mouseGrabbed ) // If grabbed mouse
     {
         // Piu-piu mazafaka
@@ -11385,6 +11393,12 @@ void NC_STACK_ypaworld::GuiWinToFront(GuiBase *win)
 
 void NC_STACK_ypaworld::GuiWinOpen(GuiBase *win)
 {
+#ifdef __ANDROID__
+    if (win == &lstvw2 || win == &exit_menu) {
+        _mouseGrabbed=false;
+        SDL_Log("OpenUA dialog entered pointer mode");
+    }
+#endif
     if ( win->flags & GuiBase::FLAG_CLOSED )
     {
         win->flags &= ~GuiBase::FLAG_CLOSED;

@@ -13,6 +13,7 @@
 #include <memory>
 
 bool UAAndroidUnitMenuIsOpen();
+bool UAAndroidModalIsOpen();
 
 namespace Android {
 static Settings settings, draft;
@@ -143,7 +144,7 @@ int FrameRate() { return settings.fps; }
 void SetControllerPresent(bool present) { controller=present; }
 int TouchOpacity() { return settings.touchOpacity; }
 bool TouchEnabled() { return mission && (settings.touch==1 || (settings.touch==0 && !controller)); }
-bool TouchVisible() { return TouchEnabled() && !UAAndroidUnitMenuIsOpen(); }
+bool TouchVisible() { return TouchEnabled() && !UAAndroidUnitMenuIsOpen() && !(mission && UAAndroidModalIsOpen()); }
 SDL_Rect Viewport() {
     ReadInsets();
     auto size=System::GetResolution();

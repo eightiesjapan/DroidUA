@@ -6,6 +6,7 @@
 
 bool UAAndroidMapIsTarget(const TClickBoxInf &input);
 bool UAAndroidMapIsOpen();
+bool UAAndroidModalIsOpen();
 void UAAndroidPanMap(float x,float y);
 #include "system/gfx.h"
 #include "system/system.h"
@@ -18,7 +19,7 @@ std::map<SDL_FingerID,TouchFinger> fingers;
 bool touchPlaying=false, touchPointer=false, manualTouchHeld=false, releaseTouchMouse=false;
 Uint32 currentButtons=0, touchPressedLatch=0;
 
-float touchPanX=0,touchPanY=0;
+float mapPanX=0,mapPanY=0;
 std::array<AndroidTouch::Control,5> TouchLayout() {
     auto size=GFX::Engine.GetScreenSize();
     return AndroidTouch::Layout(size.x,size.y,touchPointer,UAAndroidMapIsOpen());
@@ -82,7 +83,7 @@ void NC_STACK_winp::AndroidReset()
     if(rightClick || r1Held) OnMouseUp(_mPos,SDL_BUTTON_RIGHT,1);
     leftClick=rightClick=manualTouchHeld=releaseTouchMouse=false;
     r1Held=r1Pressed=false; r1Map=nullptr; r1Gesture=AndroidPointerGesture();
-    moveX=moveY=lookX=lookY=touchPanX=touchPanY=0;
+    moveX=moveY=lookX=lookY=mapPanX=mapPanY=0;
     lastTick=0;
 }
 
@@ -125,7 +126,8 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
     auto down = [&](int b) { return (buttons & (1u << b)) != 0; };
     auto pressed = [&](int b) { return down(b) && !(previous & (1u << b)); };
     if (playing && !wasPlaying) grabbed = true;
-    if (!playing) grabbed = false;
+    const bool modal = playing && UAAndroidModalIsOpen();
+    if (!playing || modal) grabbed = false;
 
     if (pressed(SDL_CONTROLLER_BUTTON_START)) grabbed = false;
 
@@ -138,13 +140,16 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
     r1Pressed = pressed(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
     moveX = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_LEFTX)+touchLX));
     moveY = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_LEFTY)+touchLY));
-    touchPanX=touchPanY=0;
-    if (playing && !grabbed && UAAndroidMapIsOpen()) {
-        touchPanX=touchRX; touchPanY=touchRY;
-        touchRX=touchRY=0; // Touch pan never also turns the vehicle/camera.
-    }
+    mapPanX=mapPanY=0;
     lookX = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_RIGHTX)+touchRX));
     lookY = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_RIGHTY)+touchRY));
+    if (playing && !modal && UAAndroidMapIsOpen()) {
+        // Physical right stick pans anywhere, in either interaction mode.
+        // The touch Look pad retains its existing pointer-mode Pan behaviour.
+        mapPanX=std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_RIGHTX)+(!grabbed?touchRX:0)));
+        mapPanY=std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_RIGHTY)+(!grabbed?touchRY:0)));
+        lookX=grabbed?touchRX:0; lookY=grabbed?touchRY:0;
+    }
     if (pointer && (moveX || moveY)) {
         static float x = 320, y = 240;
         static Common::Point last;
@@ -173,7 +178,7 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
         }
     };
     mouse(SDL_BUTTON_LEFT, down(SDL_CONTROLLER_BUTTON_LEFTSHOULDER) || (!playing && down(SDL_CONTROLLER_BUTTON_A)), leftClick);
-    mouse(SDL_BUTTON_RIGHT, down(24), rightClick);
+    // L2/R2 are weapon duplicates; neither generates a right mouse click.
     std::map<int, bool> keys;
     keys[Input::KC_ESCAPE] = down(SDL_CONTROLLER_BUTTON_START) || (!playing && down(SDL_CONTROLLER_BUTTON_B));
     keys[Input::KC_M] = playing && down(SDL_CONTROLLER_BUTTON_BACK);
@@ -194,8 +199,10 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
 
 void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed)
 {
+    const bool modal = playing && UAAndroidModalIsOpen();
+    if (modal) grabbed=false;
     if (r1Pressed) r1Map = !grabbed && UAAndroidMapIsTarget(input->ClickInf) ? input->ClickInf.selected_btn : nullptr;
-    auto gesture = r1Gesture.Update(playing && (pad || Android::TouchVisible()) && !touchPanX && !touchPanY, r1Held,
+    auto gesture = r1Gesture.Update(playing && !modal && (pad || Android::TouchVisible()) && !mapPanX && !mapPanY, r1Held,
         !grabbed && UAAndroidMapIsTarget(input->ClickInf), UAAndroidMapIsOpen(),
         _mPos.x, _mPos.y, lookX, lookY, frameDt, SDL_GetTicks());
     if (gesture.toggle) {
@@ -216,12 +223,12 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
         if (gesture.up) input->ClickInf.flag |= TClickBoxInf::FLAG_RM_UP;
     }
     touchPointer=!grabbed;
-    if (playing && !grabbed && Android::TouchVisible() && (touchPanX || touchPanY))
-        UAAndroidPanMap(touchPanX*220.0f*frameDt,touchPanY*220.0f*frameDt);
+    if (playing && !modal && (mapPanX || mapPanY))
+        UAAndroidPanMap(mapPanX*220.0f*frameDt,mapPanY*220.0f*frameDt);
     if (!playing || (!pad && !Android::TouchVisible())) return;
     // Disable desktop joystick expressions; those assume a flight-stick throttle.
     for (int i = 12; i <= 16; ++i) input->Sliders[i] = 0;
-    if (grabbed) {
+    if (grabbed && !modal) {
         input->Sliders[0] += lookX;
         input->Sliders[1] += lookY;
         input->Sliders[2] -= moveY;
@@ -229,8 +236,8 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
         input->Sliders[4] -= moveY;
         input->Sliders[5] -= lookY * 1.5f;
         // B/A retain the primary/secondary actions used in the first prototype.
-        if (currentButtons & ((1u << SDL_CONTROLLER_BUTTON_A) | (1u << 25))) input->Buttons.Set(0);
-        if (currentButtons & (1u << SDL_CONTROLLER_BUTTON_B)) input->Buttons.Set(2);
+        if (currentButtons & ((1u << SDL_CONTROLLER_BUTTON_A) | (1u << 24))) input->Buttons.Set(0);
+        if (currentButtons & ((1u << SDL_CONTROLLER_BUTTON_B) | (1u << 25))) input->Buttons.Set(2);
     }
 }
 
