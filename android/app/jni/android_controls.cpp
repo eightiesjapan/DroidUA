@@ -114,9 +114,20 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
         SDL_GameControllerUpdate();
         for (int b = 0; b < SDL_CONTROLLER_BUTTON_MAX; ++b)
             if (SDL_GameControllerGetButton(pad, static_cast<SDL_GameControllerButton>(b))) buttons |= 1u << b;
-        // Triggers are analog axes, not shoulder buttons.
-        if (axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 0.3f) buttons |= 1u << 24;
-        if (axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 0.3f) buttons |= 1u << 25;
+        // The Anbernic driver advertises trigger axes but also sends digital
+        // Android BUTTON_L2/R2 events. SDL's Android backend exposes those as
+        // raw joystick buttons 15/16; its generated controller map ignores them.
+        // Limit this fallback to the built-in pad: HID pads may use these raw
+        // button numbers for unrelated actions.
+        SDL_Joystick *joystick=SDL_GameControllerGetJoystick(pad);
+        const char *name=SDL_GameControllerName(pad);
+        const bool digitalTriggers=name && std::string(name)=="retrogame_joypad";
+        if (axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 0.3f ||
+            (digitalTriggers && SDL_JoystickGetButton(joystick,15))) buttons |= 1u << 24;
+        if (axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 0.3f ||
+            (digitalTriggers && SDL_JoystickGetButton(joystick,16))) buttons |= 1u << 25;
+        if ((buttons ^ previous) & ((1u << 24) | (1u << 25)))
+            SDL_Log("OpenUA weapon triggers: L2=%d R2=%d",bool(buttons & (1u << 24)),bool(buttons & (1u << 25)));
     }
     touchPlaying=playing;
     float touchLX=0,touchLY=0,touchRX=0,touchRY=0;

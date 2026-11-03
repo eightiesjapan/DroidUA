@@ -305,3 +305,13 @@ pointer with overlays hidden, and a direct Cancel tap dismisses it and restores
 controls. No saves written; app backgrounded after training checks. Physical
 right-stick and analog-trigger feel still require the user's hands-on test.
 Pixel has not yet received this APK.
+
+2026-11-03 RG477V digital L2/R2 compatibility fix
+The built-in retrogame_joypad advertises trigger axes, but its Android L2/R2
+key events are delivered as SDL raw joystick buttons 15/16, omitted from the
+generated controller mapping. Read these digital signals in addition to analog
+trigger axes for this named built-in pad only, avoiding unrelated HID buttons.
+L2 duplicates A and R2 duplicates B, including held/released state. Added trigger
+transition logs for diagnosis. Android build passed; installed in place on
+RG477V. Logs confirm both L2 and R2 press/release transitions; user played and
+confirmed both triggers shoot. Pixel awaits latest APK update.
