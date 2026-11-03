@@ -41,7 +41,7 @@ void TouchAxes(float &lx,float &ly,float &rx,float &ry,Uint32 &buttons) {
     auto layout=TouchLayout();
     buttons |= touchPressedLatch;
     touchPressedLatch=0;
-    const int mapping[]={-1,-1,SDL_CONTROLLER_BUTTON_A,SDL_CONTROLLER_BUTTON_B,
+    const int mapping[]={-1,-1,26,27,
         SDL_CONTROLLER_BUTTON_RIGHTSHOULDER};
     for(const auto &entry:fingers) {
         int c=entry.second.control;
@@ -193,8 +193,10 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
     std::map<int, bool> keys;
     keys[Input::KC_ESCAPE] = down(SDL_CONTROLLER_BUTTON_START) || (!playing && down(SDL_CONTROLLER_BUTTON_B));
     keys[Input::KC_M] = playing && down(SDL_CONTROLLER_BUTTON_BACK);
-    keys[Input::KC_F3] = playing && down(SDL_CONTROLLER_BUTTON_X);
-    keys[Input::KC_F2] = playing && down(SDL_CONTROLLER_BUTTON_Y);
+    keys[Input::KC_P] = playing && down(SDL_CONTROLLER_BUTTON_A);
+    keys[Input::KC_NUM0] = playing && down(SDL_CONTROLLER_BUTTON_B);
+    keys[Input::KC_F5] = playing && down(SDL_CONTROLLER_BUTTON_X);
+    keys[Input::KC_L] = playing && down(SDL_CONTROLLER_BUTTON_Y);
     keys[Input::KC_Q] = playing && down(SDL_CONTROLLER_BUTTON_DPAD_UP);
     keys[Input::KC_W] = playing && down(SDL_CONTROLLER_BUTTON_DPAD_DOWN);
     keys[Input::KC_F1] = playing && down(SDL_CONTROLLER_BUTTON_DPAD_LEFT);
@@ -246,9 +248,9 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
         input->Sliders[3] += lookX;
         input->Sliders[4] -= moveY;
         input->Sliders[5] -= lookY * 1.5f;
-        // B/A retain the primary/secondary actions used in the first prototype.
-        if (currentButtons & ((1u << SDL_CONTROLLER_BUTTON_A) | (1u << 24))) input->Buttons.Set(0);
-        if (currentButtons & ((1u << SDL_CONTROLLER_BUTTON_B) | (1u << 25))) input->Buttons.Set(2);
+        // Physical triggers and touch Fire/Alt are independent of A/B hotkeys.
+        if (currentButtons & ((1u << 26) | (1u << 24))) input->Buttons.Set(0);
+        if (currentButtons & ((1u << 27) | (1u << 25))) input->Buttons.Set(2);
     }
 }
 
@@ -270,7 +272,7 @@ bool NC_STACK_winp::AndroidTouchEvent(SDL_Event *event)
         fingers[id]={control,float(p.x),float(p.y)};
 
         if(control>=2) {
-            static const int mapping[]={-1,-1,SDL_CONTROLLER_BUTTON_A,SDL_CONTROLLER_BUTTON_B,
+            static const int mapping[]={-1,-1,26,27,
                 SDL_CONTROLLER_BUTTON_RIGHTSHOULDER};
             touchPressedLatch |= 1u << mapping[control];
         }

@@ -1,3 +1,6 @@
+Current status (2026-11-03): native Android cinematics and revised hotkeys are enabled.
+The dated entries below retain the development history; see the latest entry.
+
 OpenUA Android prototype - 2026-10-27
 
 Status: ARM64 APK builds and runs on Anbernic RG477V, Android 14.
@@ -315,3 +318,30 @@ L2 duplicates A and R2 duplicates B, including held/released state. Added trigge
 transition logs for diagnosis. Android build passed; installed in place on
 RG477V. Logs confirm both L2 and R2 press/release transitions; user played and
 confirmed both triggers shoot. Pixel awaits latest APK update.
+
+2026-11-03 Controller hotkeys and original cinematics
+A sends P (pause), B sends NUM0 (held brake/auto-level/VTOL), X sends F5
+(current squad leader), Y sends L (become leader). Select retains M for map.
+L2/R2 still directly set the two weapon actions, including digital Anbernic
+triggers. Touch Fire/Alt now use separate internal bits 26/27, so neither touch
+weapons nor triggers generate A/B hotkeys. Menu A/B confirm/back is unchanged.
+Replaced movie_stub.cpp with android_movie.cpp and pinned unmodified MIT
+PL_MPEG c871f2be022ece7ef4f64230b4fb8e1fb9eb6023 in android/third_party.
+The common TMovie entry point now decodes original MPEG-1/MP2 game files through
+FSMgr, renders 4:3 GL video, streams PCM through existing OpenAL, honours volume,
+skips with touch/key/gamepad, blocks gameplay input during movies, restores GL
+state and held inputs, and excludes background sleep time. Missing files log
+and skip. Existing intro/faction/tutorial/win/lose movie events remain in use;
+this adds playback wherever the original data specifies a movie, not new events.
+Enabled gfx.movie_player in the RG477V NUCLEUS.INI and private GameData staging;
+original device config backed up at Android/rg-nucleus-before-movies.ini.
+Original .mpg assets were already present on device; no transcoding or asset
+redistribution. The APK/source repository includes the decoder, not game movies.
+Validation: Android build passed. movie_decode_test decodes all 11 original
+movies to EOF with video/audio end timestamps within 0.3 seconds. On RG477V,
+intro displayed and user confirmed sound/picture; skip returned to main menu.
+Tutorial 2 movie played all 5603 video/7156 audio frames and returned to briefing.
+Home/resume during tutorial playback succeeded with existing audio suspension.
+Installed APK in place; saves and display/touch preferences retained. Hotkey
+feel and vehicle-specific brake/leader actions await user testing. Pixel not yet
+updated; its old gfx.movie_player=off also needs enabling at next deployment.
