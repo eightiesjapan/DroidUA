@@ -1,4 +1,4 @@
-Current status (2026-11-03): native Android cinematics and revised hotkeys are enabled.
+Current status (2026-11-03): DroidUA 0.4.0-beta.1 includes launcher, folder import, save backup/restore and original cinematics.
 The dated entries below retain the development history; see the latest entry.
 
 OpenUA Android prototype - 2026-10-27
@@ -359,3 +359,55 @@ Validation: click_gesture_test passes timing, position, drag, hold, reset and
 controller cases. Android and Windows builds passed. Installed in place on
 RG477V, preserving data. User asked to verify direct map double-tap and L1
 physical double-click; hardware confirmation pending. Pixel awaits update.
+
+2026-11-03 DroidUA 0.4.0-beta.1 launcher, importer and portable saves
+App label is DroidUA (Urban Assault for Android); application ID remains
+org.openua.android, debug signing unchanged, versionCode 4. Original cyan/navy
+host-station icon generated with built-in image_gen; final PNG is in
+app/src/main/res/drawable-nodpi/droidua_icon.png. Prompt and provenance are in
+android/artwork/icon-generation.json. StarDroid's installed icon was inspected
+as a style reference; its artwork is not included in this repository.
+
+LauncherActivity runs in :launcher, separate from SDL's process, so native Exit
+can clean up its process-wide state and return to Play/import/save controls.
+The native activity holds engine.lock throughout its lifetime; import/backup/
+restore refuse to run while it is active. The existing in-game menu is retained.
+About includes eightiesjapan coordination/play-testing, GPT Sol/Astra assistance,
+OpenUA/Marisa-Chan/community, original Microsoft/TerraTools credits, controls and
+bundled native-library licence texts. This is still a development-signed beta;
+public release signing/distribution review remains a later milestone.
+
+Import uses Android ACTION_OPEN_DOCUMENT_TREE for an extracted OpenUA package.
+It accepts the package root or a wrapping directory up to two levels above it.
+Only known game-data directories and NUCLEUS.INI are copied; Windows EXEs/DLLs
+at the package root are ignored. Essential base-game assets/engine resources are
+checked. Data is copied into import-stage, before a same-filesystem directory
+swap. Existing SAVE/Ghorsave/Taersave, ENV/user.def and android-settings.cfg are
+preserved. Original source folder is never modified. Movies are enabled in the
+imported configuration; fresh Android settings use Large UI/60 FPS/Touch Auto.
+A previous installation is retained in game-previous until the next import;
+startup recovers a process death between the two directory renames. Archive
+extraction is not built into the game importer; users extract the download first.
+
+Back up saves creates a user-selected ZIP via ACTION_CREATE_DOCUMENT. It contains
+SAVE and optional expansion save folders, ENV/user.def and Android display/touch
+settings, plus versioned metadata. No maps/music/movies or other game assets.
+Restore uses ACTION_OPEN_DOCUMENT, validates archive metadata, paths, duplicate
+names, CRCs and size/count limits, then creates a private undo snapshot before
+replacing saved progress. A restore-pending marker recovers interruptions before
+Play is enabled. Undo last restore is available from the launcher. External
+backup ZIPs survive app uninstall; private saves and the undo copy do not.
+
+Validation: host Java tests pass for fresh/wrapped import, replacement preserving
+saves/settings, failed import, asset-free ZIP export, restore/undo, pending-restore
+and import recovery, invalid/traversal/duplicate ZIP paths and session locking.
+Android beta build passed. Updated RG477V in place. Actual Android SAF backup
+exported to Downloads/DroidUA-saves-2026-11-03-203219.zip (~109 KB). Restored that
+ZIP through the picker, then imported 3290 files (~398 MB) through the actual
+folder picker. All 38 progress/settings files matched the exported backup byte
+for byte afterward. Play launched the engine; native Exit returned to the launcher.
+About/controls dialog opened correctly; no runtime crash. Original private-save
+safety tar is Android/rg-before-launcher-saves.tar; post-import comparison tar is
+Android/rg-after-import-saves.tar. Device test import-source copy was removed;
+the exported user save backup remains in Downloads. RG settings retained:
+Automatic/Large/60 FPS/Touch Hide/FPS Off/10% opacity. Pixel awaits beta update.

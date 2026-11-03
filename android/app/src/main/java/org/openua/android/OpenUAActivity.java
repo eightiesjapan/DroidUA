@@ -3,6 +3,7 @@ package org.openua.android;
 import java.io.File;
 
 public class OpenUAActivity extends org.libsdl.app.SDLActivity {
+    private GameFiles.Session engineSession;
     // Native rendering uses the full surface; subtracting system insets again
     // creates black strips on phones. Immersive mode hides navigation bars.
     public int[] getContentInsets() { return new int[] {0,0,0,0}; }
@@ -23,6 +24,12 @@ public class OpenUAActivity extends org.libsdl.app.SDLActivity {
             android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
     }
     @Override protected void onCreate(android.os.Bundle state) {
+        try { engineSession=new GameFiles.Session(getFilesDir()); }
+        catch(java.io.IOException error) {
+            super.onCreate(state);
+            android.widget.Toast.makeText(this,error.getMessage(),android.widget.Toast.LENGTH_LONG).show();
+            finish(); return;
+        }
         super.onCreate(state);
         useFullDisplay();
     }
@@ -33,6 +40,7 @@ public class OpenUAActivity extends org.libsdl.app.SDLActivity {
     @Override protected void onDestroy() {
         boolean finished=isFinishing();
         super.onDestroy(); // SDL joins the native thread and releases its resources first.
+        if(engineSession!=null) try { engineSession.close(); } catch(java.io.IOException ignored) {}
         // The legacy engine/GL wrapper own process-wide state. A completed Exit
         // must start with fresh native globals next time, rather than reuse them.
         // Home/background pause never finishes the activity and keeps the game alive.

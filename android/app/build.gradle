@@ -1,6 +1,7 @@
 plugins { id 'com.android.application' }
 android {
     namespace 'org.openua.android'
+    buildFeatures { buildConfig true }
     compileSdk 35
     buildToolsVersion '36.0.0'
     ndkVersion '30.0.16248370'
@@ -9,8 +10,8 @@ android {
         applicationId 'org.openua.android'
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName '0.1-prototype'
+        versionCode 4
+        versionName '0.4.0-beta.1'
         ndk { abiFilters 'arm64-v8a' }
         externalNativeBuild { cmake { arguments '-DANDROID_STL=c++_static', '-DCMAKE_POLICY_VERSION_MINIMUM=3.5' } }
     }

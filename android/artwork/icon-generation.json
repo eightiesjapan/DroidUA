@@ -1,0 +1,5 @@
+{
+  "tool": "Built-in image_gen",
+  "asset": "../app/src/main/res/drawable-nodpi/droidua_icon.png",
+  "prompt": "Create one finished square Android launcher icon for DroidUA, a native port of the 1998 strategy game Urban Assault. Elegant minimal vector-like line art, no text and no letters. Uniform very dark navy charcoal background #071218 extending to all edges, no rounded border and no mockup. Center one distinctive geometric futuristic host station emblem: a squat circular hovering command base with two angular raised prongs/towers and a small central vertical beacon, reminiscent of Urban Assault's command station HUD symbol. Thin but clearly readable crisp cyan/teal strokes #6ddce6 with a few muted turquoise structural strokes, clean symmetrical technical silhouette, plenty of empty space around the mark, all artwork within center 60% of square. Extremely restrained flat design, like an elegant retro PC source-port launcher icon, readable at 48 pixels. No glow, no gradients, no 3D rendering, no scenery, no weapons, no extra symbols. Original artwork. Output just the icon itself."
+}
