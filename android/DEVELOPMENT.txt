@@ -490,3 +490,55 @@ and report ZIPs are Android/Temp/files/integration-results, Android/emulator-*.p
 and Android/emulator-reports. Emulator was closed without saving its read-only
 session. Source tests are android/tests and app/src/androidTest (emulator-only
 instrumentation; never run on user hardware). No game data committed.
+
+2026-11-04 DroidUA 0.4.0-beta.3 - optional touch controls / gamepad mapping
+VersionCode 6; same package/signing key. Updated RG477V in place. Original
+SAVE, ENV/user.def, android-settings.cfg and v1 custom touch layout are in
+Android/rg-before-beta3-update.tar. Immediate post-install tar matches SHA256
+D005AEFA4BEAD8B0D63D1A3247E78E91AB533B27459A070ACE522E5D567B437B.
+
+Default touch layout now mirrors Fire/Lead, Alt/Leader and Brake/Mode around
+Move/Look, based on the user's screenshot. New Buttons checklist replaces Preset:
+all 14 controls may be shown/hidden. Disabled controls are grey in the editor,
+remain draggable, and are neither drawn nor hit-tested during gameplay. Optional
++, -, Unit, Squad, A1 and A5 start disabled near the top corners. They invoke map
+zoom in/out, F6 unit/host-turret cycling, F7 squad-leader cycling, aggression 1/5.
+Touch layout file format v2 includes per-control enabled flags. V1 files migrate
+with their original eight buttons enabled and six optional buttons disabled.
+Layout fitting handles active controls first so hidden controls cannot displace
+them; mirrors/bounds/HUD clearance checked on both logical interface sizes and
+wide/4:3 screens. Moving a grey button does not implicitly enable it: use Buttons.
+
+Main menu Input Settings is now Gamepad Settings on Android. Opens a separate
+launcher-process Activity with a scrollable button list and action pickers,
+Reset/Cancel/Save. Ten editable inputs: A/B/X/Y, L1/L2/R1/R2, L3/R3. L3/R3 default
+to Unused. Select (map) and Start (menu) stay fixed, with sticks/D-pad unchanged.
+Menu navigation remains physical A/L1 click, B back regardless of mission binds.
+Actions include all existing defaults, the six new actions, duplicate map/menu
+shortcuts, and Unused. Duplicate assignments are allowed. A semantic action mask
+separates touch from gamepad mapping and direct engine hotkeys from keyboard
+profile bindings. Held Brake applies engine button 3; Fire/Alt apply independent
+engine buttons 0/2. RG digital trigger fallback and analog triggers are retained.
+Native cached mappings reload on resume after editor Save. Physical remapping is
+stored in game/android-gamepad.cfg, included in import preservation, portable
+backup/restore/undo and diagnostics. Old backups without it restore defaults.
+
+Checks PASS: Android build, shared Windows build, native touch layout and gamepad
+configuration tests, Java touch/gamepad configuration and full game-file backup
+suite (including gamepad backup/restore/undo and old backups). Native tests cover
+fixed Start/Select, L3/R3, action hotkeys, independent triggers and disabled touch
+hit targets. Actual RG UI: Gamepad Settings opens from main menu; L3 zoom and
+L2 unit cycling were saved/read back, then Reset/Save restored the intended
+original default mappings (L2 Fire, R2 Alt, L3/R3 Unused). Checklist hid Lead,
+enabled +, dragged + and persisted v2; reopened editor visually confirmed it.
+Brief gameplay rendered normally; map HUD opens pointer mode, hidden Lead is
+absent and the moved + overlay appears. + was tried while map was already at
+maximum zoom, so no visible zoom change was expected/claimed. Physical button
+presses and all six optional actions still need the user's playtesting.
+
+After checks, touch Reset/Save applied the new mirrored default to RG with six
+extras disabled; gamepad defaults restored and original 47% touch opacity retained.
+Exited the test mission without saving it, then exited native game to launcher.
+No crash observed. Pixel remains on its previous beta until connected. Artifacts
+and unstripped symbols: Android/Releases/0.4.0-beta.3. UI screenshots are under
+Android/rg-beta3-*.png. No emulator/test-APK installed on user hardware.

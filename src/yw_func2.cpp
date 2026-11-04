@@ -1526,6 +1526,10 @@ void UserData::ShowSaveLoadMenu()
 
 void UserData::ShowInputSettings()
 {
+#ifdef __ANDROID__
+    Android::EditGamepadSettings();
+    return;
+#endif
     titel_button->HideScreen();
 
     button_input_button->ShowScreen();

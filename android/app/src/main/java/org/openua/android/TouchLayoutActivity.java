@@ -22,9 +22,14 @@ public class TouchLayoutActivity extends Activity {
         getWindow().getDecorView().setSystemUiVisibility(5894|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         FrameLayout frame=new FrameLayout(this); editor=new Editor(); frame.addView(editor);
         LinearLayout tools=new LinearLayout(this); tools.setBackgroundColor(0xee071218);
-        add(tools,"Preset",()->new AlertDialog.Builder(this).setTitle("Touch layout").setItems(new String[]{"Default layout","Previously saved layout"},(d,which)-> {
-            draft=which==0?new TouchLayoutConfig():TouchLayoutConfig.load(config); changed=true; editor.invalidate();
-        }).show());
+        add(tools,"Buttons",()-> {
+            boolean[] active=draft.enabled.clone();
+            new AlertDialog.Builder(this).setTitle("Show touch buttons")
+                .setMultiChoiceItems(TouchLayoutConfig.NAMES,active,(d,which,on)->active[which]=on)
+                .setNegativeButton("Cancel",null).setPositiveButton("Done",(d,w)-> {
+                    System.arraycopy(active,0,draft.enabled,0,active.length);changed=true;editor.invalidate();
+                }).show();
+        });
         add(tools,"Reset",()-> { draft=new TouchLayoutConfig(); changed=true; editor.invalidate(); });
         add(tools,"Cancel",this::finish);
         add(tools,"Save",()-> {
@@ -35,7 +40,7 @@ public class TouchLayoutActivity extends Activity {
         });
         frame.addView(tools,new FrameLayout.LayoutParams(-1,Math.round(48*getResources().getDisplayMetrics().density),Gravity.TOP));
         setContentView(frame);
-        Toast.makeText(this,"Drag the buttons, then Save. Reset brings back the default layout.",Toast.LENGTH_LONG).show();
+        Toast.makeText(this,"Drag buttons to move them. Grey buttons are hidden in game; use Buttons to show or hide them.",Toast.LENGTH_LONG).show();
     }
     private void add(LinearLayout bar,String label,Runnable action) {
         Button b=new Button(this); b.setText(label); b.setAllCaps(false); b.setTextColor(0xffb9f4f7); b.setTextSize(15); b.setOnClickListener(v->action.run());
@@ -80,8 +85,8 @@ public class TouchLayoutActivity extends Activity {
             TouchLayoutConfig.Control[] list=controls();
             for(int i=0;i<list.length;++i) {
                 TouchLayoutConfig.Control c=list[i];
-                paint.setStyle(Paint.Style.FILL);paint.setColor(i==selected?0xff285862:0xe00b303b);canvas.drawCircle(c.x,c.y,c.r,paint);
-                paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.4f);paint.setColor(0xff6ddce6);canvas.drawCircle(c.x,c.y,c.r,paint);
+                paint.setStyle(Paint.Style.FILL);paint.setColor(!c.enabled?0x704c565b:(i==selected?0xff285862:0xe00b303b));canvas.drawCircle(c.x,c.y,c.r,paint);
+                paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.4f);paint.setColor(c.enabled?0xff6ddce6:0xff6c7a80);canvas.drawCircle(c.x,c.y,c.r,paint);
                 paint.setStyle(Paint.Style.FILL);paint.setTextSize(13);float length=paint.measureText(c.label);
                 if(length>c.r*1.65f) paint.setTextSize(13*c.r*1.65f/length);
                 canvas.drawText(c.label,c.x,c.y-(paint.ascent()+paint.descent())/2,paint);

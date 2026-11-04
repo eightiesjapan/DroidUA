@@ -17,7 +17,7 @@ public final class GameFiles {
         InputStream open() throws IOException;
     }
     public interface Progress { void update(String message); }
-    private static final String[] PROGRESS={"SAVE","Ghorsave","Taersave","ENV/user.def","android-settings.cfg","android-touch-layout.cfg"};
+    private static final String[] PROGRESS={"SAVE","Ghorsave","Taersave","ENV/user.def","android-settings.cfg","android-touch-layout.cfg","android-gamepad.cfg"};
     private static final String META="droidua-backup.properties";
     private static final long BACKUP_LIMIT=512L*1024*1024, IMPORT_LIMIT=4L*1024*1024*1024;
     private static final Set<String> IMPORT_DIRS=new HashSet<>(Arrays.asList(

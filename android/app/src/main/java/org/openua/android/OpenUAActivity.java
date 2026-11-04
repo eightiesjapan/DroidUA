@@ -50,6 +50,9 @@ public class OpenUAActivity extends org.libsdl.app.SDLActivity {
     public void showTouchLayoutEditor() {
         runOnUiThread(()->startActivity(new android.content.Intent(this,TouchLayoutActivity.class)));
     }
+    public void showGamepadSettings() {
+        runOnUiThread(()->startActivity(new android.content.Intent(this,GamepadSettingsActivity.class)));
+    }
     @Override protected String[] getLibraries() { return new String[] { "SDL2", "SDL2_image", "gl4es", "main" }; }
     @Override protected String[] getArguments() {
         File data = new File(getFilesDir(), "game");

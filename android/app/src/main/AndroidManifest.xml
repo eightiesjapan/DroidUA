@@ -8,6 +8,7 @@
 
         </activity>
         <activity android:name=".TouchLayoutActivity" android:process=":launcher" android:exported="false" android:screenOrientation="landscape" android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
+        <activity android:name=".GamepadSettingsActivity" android:process=":launcher" android:exported="false" android:screenOrientation="landscape" android:theme="@android:style/Theme.Material.NoActionBar" android:configChanges="orientation|screenSize|keyboardHidden|uiMode" />
         <activity android:name=".LauncherActivity" android:process=":launcher" android:exported="true" android:launchMode="singleTop"
             android:theme="@android:style/Theme.Material.NoActionBar" android:configChanges="orientation|screenSize|keyboardHidden|uiMode">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>

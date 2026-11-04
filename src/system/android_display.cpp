@@ -21,7 +21,16 @@ namespace Android {
 static Settings settings, draft;
 static AndroidTouch::Config touchConfiguration;
 static std::atomic<bool> touchNeedsReload(true);
-void ReloadTouchLayout() { touchNeedsReload=true; }
+static AndroidControls::Config gamepadConfiguration;
+static std::atomic<bool> gamepadNeedsReload(true);
+void ReloadControls() { touchNeedsReload=true;gamepadNeedsReload=true; }
+const AndroidControls::Config &GamepadConfiguration() {
+    if(gamepadNeedsReload.exchange(false)) {
+        gamepadConfiguration=AndroidControls::Config();std::ifstream in("android-gamepad.cfg");
+        if(in && !AndroidControls::ReadConfig(in,gamepadConfiguration)) SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Invalid gamepad settings; using defaults");
+    }
+    return gamepadConfiguration;
+}
 const AndroidTouch::Config &TouchConfiguration() {
     if(touchNeedsReload.exchange(false)) {
         touchConfiguration=AndroidTouch::Config();
@@ -39,6 +48,14 @@ static void EditTouchLayout() {
     if(method) env->CallVoidMethod(activity,method);
     if(env->ExceptionCheck()) env->ExceptionClear();
     env->DeleteLocalRef(cls); env->DeleteLocalRef(activity);
+}
+void EditGamepadSettings() {
+    JNIEnv *env=static_cast<JNIEnv *>(SDL_AndroidGetJNIEnv());
+    jobject activity=static_cast<jobject>(SDL_AndroidGetActivity());if(!activity) return;
+    jclass cls=env->GetObjectClass(activity);jmethodID method=env->GetMethodID(cls,"showGamepadSettings","()V");
+    if(method) env->CallVoidMethod(activity,method);
+    if(env->ExceptionCheck()) env->ExceptionClear();
+    env->DeleteLocalRef(cls);env->DeleteLocalRef(activity);
 }
 static bool mission=false, controller=false;
 static int safe[4]={0,0,0,0};

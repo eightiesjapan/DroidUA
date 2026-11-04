@@ -827,7 +827,7 @@ static int AndroidLifecycle(void *,SDL_Event *event)
         // Exclude sleep time even for a brief background switch below 2 seconds.
         if(Input::Engine._timer) Input::Engine._timer->itimer_func64();
         userdata.ResetInputPeriod=true;
-        Android::ReloadTouchLayout();
+        Android::ReloadControls();
         androidSuspended=false;
         SDL_Log("OpenUA resumed at game time %d",ypaworld ? ypaworld->_timeStamp : -1);
     }

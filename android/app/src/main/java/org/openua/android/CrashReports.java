@@ -51,7 +51,7 @@ public final class CrashReports {
             File dir=directory(c);
             for(String name:new String[]{"session.txt","java-crash.txt","native-crash.txt","system-exit.txt","system-trace.bin",
                 "game-log.txt","game-log.txt.1","game-log.txt.2","game-log.txt.3"}) entry(zip,name,new File(dir,name));
-            for(String name:new String[]{"android-settings.cfg","android-touch-layout.cfg"}) entry(zip,"settings/"+name,new File(c.getFilesDir(),"game/"+name));
+            for(String name:new String[]{"android-settings.cfg","android-touch-layout.cfg","android-gamepad.cfg"}) entry(zip,"settings/"+name,new File(c.getFilesDir(),"game/"+name));
         }
     }
     /** Called on a worker when returning to the launcher; native crash handling runs here, not in the signal handler. */

@@ -5,11 +5,14 @@
 #include <SDL2/SDL.h>
 class NC_STACK_button;
 namespace AndroidTouch { struct Config; }
+namespace AndroidControls { struct Config; }
 namespace Android {
 struct Settings { int layout=0, large=0, fps=60, touch=0, showFPS=0, touchOpacity=75; };
 void LoadSettings();
-void ReloadTouchLayout();
+void ReloadControls();
 const AndroidTouch::Config &TouchConfiguration();
+const AndroidControls::Config &GamepadConfiguration();
+void EditGamepadSettings();
 void BeginSettings(NC_STACK_button *menu);
 bool CycleSetting(int event, NC_STACK_button *menu);
 bool ApplySettings();

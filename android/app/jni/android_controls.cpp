@@ -19,6 +19,8 @@ struct TouchFinger { int control; float x,y; };
 std::map<SDL_FingerID,TouchFinger> fingers;
 bool touchPlaying=false, touchPointer=false, manualTouchHeld=false, releaseTouchMouse=false;
 Uint32 currentButtons=0, touchPressedLatch=0;
+Uint32 currentActions=0, previousActions=0, pendingHotkeys=0;
+bool selectPressed=false;
 
 float mapPanX=0,mapPanY=0;
 std::array<AndroidTouch::Control,AndroidTouch::Count> TouchLayout() {
@@ -42,8 +44,6 @@ void TouchAxes(float &lx,float &ly,float &rx,float &ry,Uint32 &buttons) {
     auto layout=TouchLayout();
     buttons |= touchPressedLatch;
     touchPressedLatch=0;
-    const int mapping[]={-1,-1,26,27,
-        SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,28,29,30};
     for(const auto &entry:fingers) {
         int c=entry.second.control;
         if(c<0) continue;
@@ -54,7 +54,7 @@ void TouchAxes(float &lx,float &ly,float &rx,float &ry,Uint32 &buttons) {
             if(length>1) {x/=length; y/=length;}
             if(length<.12f) x=y=0;
             if(c==0) {lx=x; ly=y;} else {rx=x; ry=y;}
-        } else buttons |= 1u << mapping[c];
+        } else buttons |= AndroidControls::Bit(AndroidTouch::Action(c));
     }
 }
 SDL_GameController *pad = nullptr;
@@ -79,6 +79,8 @@ float axis(SDL_GameControllerAxis a) {
 void NC_STACK_winp::AndroidReset()
 {
     fingers.clear(); touchPressedLatch=0; currentButtons=previous=0;
+    currentActions=previousActions=pendingHotkeys=0;
+    selectPressed=false;
     for(const auto &key:previousKeys) if(key.second) KeyUp(key.first);
     previousKeys.clear();
     if(leftClick || manualTouchHeld) OnMouseUp(_mPos,SDL_BUTTON_LEFT,1);
@@ -134,11 +136,19 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
     }
     touchPlaying=playing;
     float touchLX=0,touchLY=0,touchRX=0,touchRY=0;
-    TouchAxes(touchLX,touchLY,touchRX,touchRY,buttons);
+    Uint32 touchActions=0;
+    TouchAxes(touchLX,touchLY,touchRX,touchRY,touchActions);
     currentButtons=buttons;
+    currentActions=AndroidControls::Actions(Android::GamepadConfiguration(),buttons)|touchActions;
+    const Uint32 actionPressed=playing ? currentActions&~previousActions:0;
+    if(!playing) pendingHotkeys=0;
+    for(int action=1;action<AndroidControls::ActionCount;++action)
+        if(AndroidControls::Hotkey(action)>=0) pendingHotkeys|=actionPressed&AndroidControls::Bit(action);
+    previousActions=currentActions;
     if(releaseTouchMouse) { OnMouseUp(_mPos,SDL_BUTTON_LEFT,1); manualTouchHeld=false; releaseTouchMouse=false; }
     auto down = [&](int b) { return (buttons & (1u << b)) != 0; };
     auto pressed = [&](int b) { return down(b) && !(previous & (1u << b)); };
+    selectPressed=playing && pressed(SDL_CONTROLLER_BUTTON_BACK);
     if (playing && !wasPlaying) grabbed = true;
     const bool modal = playing && UAAndroidModalIsOpen();
     if (!playing || modal) grabbed = false;
@@ -150,8 +160,8 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
     const float dt = lastTick ? std::min((now - lastTick) / 1000.0f, 0.05f) : 0.0f;
     lastTick = now;
     frameDt = dt;
-    r1Held = down(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
-    r1Pressed = pressed(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER);
+    r1Held = (currentActions&AndroidControls::Bit(AndroidControls::Mode))!=0;
+    r1Pressed = (actionPressed&AndroidControls::Bit(AndroidControls::Mode))!=0;
     moveX = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_LEFTX)+touchLX));
     moveY = std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_LEFTY)+touchLY));
     mapPanX=mapPanY=0;
@@ -193,15 +203,10 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
             old = held;
         }
     };
-    mouse(SDL_BUTTON_LEFT, down(SDL_CONTROLLER_BUTTON_LEFTSHOULDER) || (!playing && down(SDL_CONTROLLER_BUTTON_A)), leftClick);
-    // L2/R2 are weapon duplicates; neither generates a right mouse click.
+    mouse(SDL_BUTTON_LEFT, playing ? bool(currentActions&AndroidControls::Bit(AndroidControls::Click)):
+        down(SDL_CONTROLLER_BUTTON_LEFTSHOULDER)||down(SDL_CONTROLLER_BUTTON_A),leftClick);
     std::map<int, bool> keys;
     keys[Input::KC_ESCAPE] = down(SDL_CONTROLLER_BUTTON_START) || (!playing && down(SDL_CONTROLLER_BUTTON_B));
-    keys[Input::KC_M] = playing && down(SDL_CONTROLLER_BUTTON_BACK);
-    keys[Input::KC_P] = playing && down(SDL_CONTROLLER_BUTTON_A);
-    keys[Input::KC_NUM0] = playing && (down(SDL_CONTROLLER_BUTTON_B) || down(28));
-    keys[Input::KC_F5] = playing && (down(SDL_CONTROLLER_BUTTON_X) || down(29));
-    keys[Input::KC_L] = playing && (down(SDL_CONTROLLER_BUTTON_Y) || down(30));
     keys[Input::KC_Q] = playing && down(SDL_CONTROLLER_BUTTON_DPAD_UP);
     keys[Input::KC_W] = playing && down(SDL_CONTROLLER_BUTTON_DPAD_DOWN);
     keys[Input::KC_F1] = playing && down(SDL_CONTROLLER_BUTTON_DPAD_LEFT);
@@ -244,6 +249,15 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
     if (playing && !modal && (mapPanX || mapPanY))
         UAAndroidPanMap(mapPanX*220.0f*frameDt,mapPanY*220.0f*frameDt);
     if (!playing || (!pad && !Android::TouchVisible())) return;
+    // Semantic actions bypass profile keyboard bindings. Fixed Start/Select and
+    // desktop/mouse keyboard behavior remain separate from remappable buttons.
+    using namespace AndroidControls;
+    if(!modal && selectPressed) input->HotKeyID=8;
+    else if(!modal) for(int action=1;action<ActionCount;++action) if(pendingHotkeys&Bit(action)) {
+        input->HotKeyID=Hotkey(action);pendingHotkeys&=~Bit(action);break;
+    }
+    if(modal) pendingHotkeys=0;
+    if(!modal && (currentActions&Bit(Brake))) input->Buttons.Set(3);
     // Disable desktop joystick expressions; those assume a flight-stick throttle.
     for (int i = 12; i <= 16; ++i) input->Sliders[i] = 0;
     if (grabbed && !modal) {
@@ -254,8 +268,8 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
         input->Sliders[4] -= moveY;
         input->Sliders[5] -= lookY * 1.5f;
         // Physical triggers and touch Fire/Alt are independent of A/B hotkeys.
-        if (currentButtons & ((1u << 26) | (1u << 24))) input->Buttons.Set(0);
-        if (currentButtons & ((1u << 27) | (1u << 25))) input->Buttons.Set(2);
+        if(currentActions&Bit(Fire)) input->Buttons.Set(0);
+        if(currentActions&Bit(Alt)) input->Buttons.Set(2);
     }
 }
 
@@ -277,9 +291,7 @@ bool NC_STACK_winp::AndroidTouchEvent(SDL_Event *event)
         fingers[id]={control,float(p.x),float(p.y)};
 
         if(control>=2) {
-            static const int mapping[]={-1,-1,26,27,
-                SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,28,29,30};
-            touchPressedLatch |= 1u << mapping[control];
+            touchPressedLatch |= AndroidControls::Bit(AndroidTouch::Action(control));
         }
     }
     auto found=fingers.find(id);
@@ -322,6 +334,7 @@ void NC_STACK_winp::AndroidDrawTouchControls(SDL_Surface *screen)
     auto layout=TouchLayout();
     const Uint8 alpha=Uint8(Android::TouchOpacity()*255/100);
     for(int i=0;i<int(layout.size());++i) {
+        if(!layout[i].enabled) continue;
         bool held=false; float x=layout[i].x,y=layout[i].y;
         for(const auto &f:fingers) if(f.second.control==i) {held=true;x=f.second.x;y=f.second.y;}
         auto c=layout[i];

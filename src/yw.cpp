@@ -2551,6 +2551,9 @@ bool NC_STACK_ypaworld::CreateTitleControls(){
             btn_64arg.ypos = _screenSize.y * 0.4333333333333334;
             btn_64arg.width = _screenSize.x / 3;
             btn_64arg.caption = Locale::Text::Title(Locale::TITLE_INPUT);
+#ifdef __ANDROID__
+            btn_64arg.caption = "Gamepad Settings";
+#endif
             btn_64arg.caption2.clear();
             btn_64arg.pressedCode = 0;
             btn_64arg.downCode = UIWidgets::MAIN_MENU_EVENT_IDS::ALL_DOWN;
