@@ -4,9 +4,12 @@
 #include "common/common.h"
 #include <SDL2/SDL.h>
 class NC_STACK_button;
+namespace AndroidTouch { struct Config; }
 namespace Android {
 struct Settings { int layout=0, large=0, fps=60, touch=0, showFPS=0, touchOpacity=75; };
 void LoadSettings();
+void ReloadTouchLayout();
+const AndroidTouch::Config &TouchConfiguration();
 void BeginSettings(NC_STACK_button *menu);
 bool CycleSetting(int event, NC_STACK_button *menu);
 bool ApplySettings();

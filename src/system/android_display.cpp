@@ -11,12 +11,35 @@
 #include <fstream>
 #include <cstdio>
 #include <memory>
+#include <atomic>
+#include "../../android/app/jni/android_touch_layout.h"
 
 bool UAAndroidUnitMenuIsOpen();
 bool UAAndroidModalIsOpen();
 
 namespace Android {
 static Settings settings, draft;
+static AndroidTouch::Config touchConfiguration;
+static std::atomic<bool> touchNeedsReload(true);
+void ReloadTouchLayout() { touchNeedsReload=true; }
+const AndroidTouch::Config &TouchConfiguration() {
+    if(touchNeedsReload.exchange(false)) {
+        touchConfiguration=AndroidTouch::Config();
+        std::ifstream in("android-touch-layout.cfg");
+        if(in && !AndroidTouch::ReadConfig(in,touchConfiguration))
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,"Invalid touch layout; using default");
+    }
+    return touchConfiguration;
+}
+static void EditTouchLayout() {
+    JNIEnv *env=static_cast<JNIEnv *>(SDL_AndroidGetJNIEnv());
+    jobject activity=static_cast<jobject>(SDL_AndroidGetActivity());
+    jclass cls=env->GetObjectClass(activity);
+    jmethodID method=env->GetMethodID(cls,"showTouchLayoutEditor","()V");
+    if(method) env->CallVoidMethod(activity,method);
+    if(env->ExceptionCheck()) env->ExceptionClear();
+    env->DeleteLocalRef(cls); env->DeleteLocalRef(activity);
+}
 static bool mission=false, controller=false;
 static int safe[4]={0,0,0,0};
 static float measuredFPS=0;
@@ -75,6 +98,7 @@ bool CycleSetting(int event, NC_STACK_button *menu) {
     case 6102: draft.fps=draft.fps==60 ? 30 : 60; break;
     case 6103: draft.touch=(draft.touch+1)%3; break;
     case 6104: draft.showFPS=!draft.showFPS; break;
+    case 6108: EditTouchLayout(); break;
     case 6105: case 6106: case 6107:
         if(auto slider=menu->GetSliderData(6005)) draft.touchOpacity=slider->value;
         break;
@@ -124,15 +148,20 @@ void ConfigureMenu(NC_STACK_button *menu) {
         b.txt_r=button ? 220 : 80; b.txt_g=button ? 240 : 190; b.txt_b=button ? 240 : 190;
         menu->Add(&b);
     };
+    // Row eight was freed by removing desktop-only cursor/window options.
+    for(size_t i=0;i<menu->field_d8.size();++i) if((menu->field_d8[i].ypos+step/2)/step==7) {
+        menu->field_d8[i].ypos+=step; menu->buttons[i].y+=step;
+    }
     add(6050,0,"ANDROID DISPLAY",false);
-    const char *labels[]={"Screen layout","Interface size","Frame rate","Touch controls","Show FPS"};
-    for(int i=0;i<5;++i) { add(6060+i,i+1,labels[i],false); add(6000+i,i+1,"...",true); }
-    add(6065,6,"Touch opacity",false);
+    const char *labels[]={"Screen layout","Interface size","Frame rate","Show FPS","Touch controls","Touch screen"};
+    const int ids[]={0,1,2,4,3,8};
+    for(int i=0;i<6;++i) { add(6060+ids[i],i+1,labels[i],false); add(6000+ids[i],i+1,ids[i]==8?"Edit layout":"...",true); }
+    add(6065,7,"Touch opacity",false);
     NC_STACK_button::Slider opacity={};
     opacity.min=10; opacity.max=100; opacity.value=draft.touchOpacity;
     NC_STACK_button::button_64_arg b={};
     b.button_type=NC_STACK_button::TYPE_SLIDER; b.button_id=6005;
-    b.xpos=contentWidth/2; b.ypos=6*step; b.width=contentWidth/2;
+    b.xpos=contentWidth/2; b.ypos=7*step; b.width=contentWidth/2;
     b.caption=" "; b.tileset_up=18; b.tileset_down=18; b.field_3A=30;
     b.downCode=6105; b.pressedCode=6106; b.upCode=6107; b.field_34=&opacity;
     menu->Add(&b);

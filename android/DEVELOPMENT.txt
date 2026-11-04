@@ -411,3 +411,82 @@ safety tar is Android/rg-before-launcher-saves.tar; post-import comparison tar i
 Android/rg-after-import-saves.tar. Device test import-source copy was removed;
 the exported user save backup remains in Downloads. RG settings retained:
 Automatic/Large/60 FPS/Touch Hide/FPS Off/10% opacity. Pixel awaits beta update.
+
+2026-11-04 DroidUA 0.4.0-beta.2 - touch layouts and diagnostics
+VersionCode 5, same org.openua.android ID and existing development signing key.
+APK installation with -r / Android Update retains imported game files, private
+saves, Android settings and custom layout. Never uninstall as an update step.
+Before/after emulator progress+settings tar SHA256 both:
+DA36DF9C0BB64CCE6C0A5CCB2695107EAE6ABFDA31FD487A38B463EF0E1A79E2.
+Public GitHub releases are still a future step; no automatic updater/network
+update checker was added. Permanent release-key handling must be retained across
+future published APKs, as Android requires the same signer for an in-place update.
+
+Android mission GUI initialization clears remembered map and squadron visibility
+for both host station and vehicles, retaining saved positions/sizes. Desktop
+behavior stays unchanged. Taps on open map/squad windows now enter pointer mode
+before capture can strip click flags; this includes map double-taps and corner X.
+
+Touch overlay adds Brake (Num0, brake/auto-level/VTOL) left, Leader (F5, jump to
+current squad leader) and Lead (L, become squad leader) right. L2/R2 retain their
+independent shooting bits; A/B hotkeys remain unchanged. No placement screenshot
+was received with this request, so sensible positions were chosen.
+
+Options now order Frame rate, Show FPS, Touch controls, Touch screen, Touch
+opacity. Touch screen > Edit layout opens a separate Android activity in the
+launcher process while SDL pauses. Drag any of eight controls, select default or
+previously saved preset, Reset, Save or Cancel. Custom positions are relative to
+the nearest horizontal edge and logical screen height, with bounds/HUD clearance
+and nearest-free-position collision repair. Layouts adapt between wide and 4:3;
+clamping/repositioning can alter crowded layouts. Default reset is always present.
+File: game/android-touch-layout.cfg, versioned text format, validated in Java and
+native C++. Reload is requested atomically on foreground resume. Game backups,
+restore/undo and replacement imports include/preserve this file. Old beta backups
+without it select the default layout; undo restores a newer custom layout.
+
+Diagnostics are local only. DroidUAApplication catches uncaught Java exceptions
+including activity/native-library load errors; normal platform exception handling
+is preserved. Native main installs a signal-safe fatal summary handler chaining
+the existing Android handler, and a bounded rotating SDL log (~1 MB across files).
+The launcher worker collects Android ApplicationExitInfo crash/ANR records on
+API30+, including native tombstone streams when available, and deduplicates via a
+synchronously persisted timestamp. After reopening following a crash, MediaStore
+exports Download/DroidUA/DroidUA-report-DATE.zip on API29+ where supported. Older
+Android/failed automatic export can use launcher Export diagnostics and a system
+file picker. Reports include device/build info, logs, Java/native crash details,
+Android-provided trace, display settings and touch layout; not game assets or
+saved progress. Nothing is uploaded automatically. A crash before native main on
+older Android can have less detail; Android may withhold/expire its system trace.
+Internal diagnostic files are files/diagnostics. No storage-wide permission added.
+
+Validation:
+- Android arm64 APK build and shared Windows release build PASS.
+- Host C++ layout bounds/separation/HUD/labels, extreme custom collisions and
+  malformed config parsing PASS for Standard/Large wide and 4:3 sizes.
+- Host Java layout serialization/reset/cross-aspect/collision checks PASS.
+- Host game-file tests PASS: import preservation, backup/restore/undo including
+  custom layouts and old backups, interruption recovery, ZIP validation/locking.
+- Disposable read-only API37 x86_64 emulator with ARM translation: actual editor
+  drag/save/reset/cancel PASS, diagnostic export/collection PASS, deduplication
+  across forced process restart PASS, APK in-place preservation byte-for-byte PASS.
+- Native main menu/options render; requested row order visually checked. Native
+  Options opens editor and returns, engine lifecycle pauses/resumes correctly.
+- Forced emulator SIGABRT produced an Android native tombstone plus SDL log in
+  automatic Downloads report. ARM handler's own fallback text cannot be verified
+  through the emulator's host-to-guest signal bridge; physical test is pending.
+- Mission-level test was blocked by emulator vendor GLESv1 glShadeModel null-call
+  while rendering the briefing vehicle (host graphics/native bridge, unchanged
+  GL4ES dependency). The new diagnostics captured that real failure too. Thus
+  mission startup, VIEW-mode map double-tap/X and new touch actions still require
+  actual RG477V/Pixel playtesting; do not report those as device-verified.
+- RG477V11011403 is connected but ADB unauthorized, including outside sandbox.
+  No update or changes made to that device this turn. It remains beta.1 from
+  previous work. Pixel also awaits this beta update. Reauthorize USB when awake,
+  then install APK with adb install -r; do not uninstall. Launch LauncherActivity.
+
+Local artifacts: Android/Releases/0.4.0-beta.2 contains final APK, SHA256 and
+unstripped native libraries for later crash-symbol analysis. Emulator test images
+and report ZIPs are Android/Temp/files/integration-results, Android/emulator-*.png
+and Android/emulator-reports. Emulator was closed without saving its read-only
+session. Source tests are android/tests and app/src/androidTest (emulator-only
+instrumentation; never run on user hardware). No game data committed.

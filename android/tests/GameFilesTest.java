@@ -43,9 +43,11 @@ public class GameFilesTest {
             check(get(game,"NUCLEUS.INI").contains("gfx.movie_player = on"),"Movies not enabled");
             check(!new File(game,"UA_source.exe").exists(),"Copied Windows executable");
             put(game,"SAVE/SDU7/user.txt","progress A"); put(game,"android-settings.cfg","opacity 27");
+            put(game,"android-touch-layout.cfg","custom layout A");
             GameFiles.importGame(new Local(source),files,s->{});
             check(get(game,"SAVE/SDU7/user.txt").equals("progress A"),"Import overwrote saves");
             check(get(game,"android-settings.cfg").equals("opacity 27"),"Import overwrote display settings");
+            check(get(game,"android-touch-layout.cfg").equals("custom layout A"),"Import overwrote custom layout");
             File broken=new File(temp,"broken"); put(broken,"DATA/world.ini","incomplete");
             reject(()->GameFiles.importGame(new Local(broken),files,s->{}));
             check(get(game,"SAVE/SDU7/user.txt").equals("progress A"),"Failed import changed saves");
@@ -53,14 +55,18 @@ public class GameFilesTest {
             try(OutputStream out=new FileOutputStream(backup)) { GameFiles.backup(game,out); }
             try(ZipFile zip=new ZipFile(backup)) {
                 check(zip.getEntry("SAVE/SDU7/user.txt")!=null,"Missing profile");
+                check(zip.getEntry("android-touch-layout.cfg")!=null,"Missing custom layout");
                 check(zip.getEntry("DATA/world.ini")==null,"Backup includes game assets");
             }
             put(game,"SAVE/SDU7/user.txt","progress B"); put(game,"SAVE/extra/user.txt","extra");
+            put(game,"android-touch-layout.cfg","custom layout B");
             GameFiles.restore(backup,files);
             check(get(game,"SAVE/SDU7/user.txt").equals("progress A"),"Restore failed");
+            check(get(game,"android-touch-layout.cfg").equals("custom layout A"),"Restore lost touch layout");
             check(!new File(game,"SAVE/extra").exists(),"Restore left stale profile");
             GameFiles.undo(files);
             check(get(game,"SAVE/SDU7/user.txt").equals("progress B"),"Undo did not restore progress");
+            check(get(game,"android-touch-layout.cfg").equals("custom layout B"),"Undo did not restore touch layout");
             check(new File(game,"SAVE/extra/user.txt").exists(),"Undo lost another profile");
             // A crashed restore is recovered before the game can be launched.
             put(files,"restore-pending","1"); put(game,"SAVE/SDU7/user.txt","partial restore");
@@ -79,6 +85,16 @@ public class GameFilesTest {
             GameFiles.delete(files,new File(files,"game-previous"));
             check(game.renameTo(new File(files,"game-previous")),"Cannot set up import recovery test");
             GameFiles.recover(files); check(GameFiles.missing(game).isEmpty(),"Interrupted import not recovered");
+            // Older beta backups contain no touch-layout file. Restoring one
+            // should choose defaults, while Undo retains the newer custom layout.
+            new File(game,"android-touch-layout.cfg").delete();
+            File legacy=new File(temp,"legacy-saves.zip");
+            try(OutputStream out=new FileOutputStream(legacy)) { GameFiles.backup(game,out); }
+            put(game,"android-touch-layout.cfg","new custom layout");
+            GameFiles.restore(legacy,files);
+            check(!new File(game,"android-touch-layout.cfg").exists(),"Old backup left an unrelated custom layout");
+            GameFiles.undo(files);
+            check(get(game,"android-touch-layout.cfg").equals("new custom layout"),"Undo of old backup lost custom layout");
             System.out.println("PASS: import validation/preservation, asset-free backup, restore/undo, crash recovery, invalid ZIPs and session locking");
         } finally { GameFiles.delete(temp.getParentFile(),temp); }
     }

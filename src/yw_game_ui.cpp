@@ -2878,6 +2878,11 @@ int sb_0x451034(NC_STACK_ypaworld *yw)
     if ( yw->_guiLoaded )
         return yw->_guiLoaded;
 
+#ifdef __ANDROID__
+    // Keep per-window geometry, but begin each mission with a clear view.
+    yw->_roboMapStatus.IsOpen=false; yw->_vhclMapStatus.IsOpen=false;
+    yw->_roboFinderStatus.IsOpen=false; yw->_vhclFinderStatus.IsOpen=false;
+#endif
     yw->_guiDragging = false;
     yw->_guiDragElement = NULL;
     yw->_guiDragDefaultMouse = false;
@@ -11116,9 +11121,10 @@ void NC_STACK_ypaworld::ypaworld_func64__sub1(TInputState *inpt)
     }
 
 #ifdef __ANDROID__
-    // Keep the original HUD directly tappable while sticks aim the vehicle.
+    // Keep the original HUD and open map/squad windows tappable while aiming.
     // Switch before capture strips the button's click flags.
-    if(_mouseGrabbed && winp->selected_btn==&bzda && winp->selected_btnID>=0 &&
+    if(_mouseGrabbed && (winp->selected_btn==&bzda || winp->selected_btn==&robo_map ||
+                          winp->selected_btn==&squadron_manager) && winp->selected_btnID>=0 &&
        (winp->flag & (TClickBoxInf::FLAG_BTN_DOWN | TClickBoxInf::FLAG_BTN_UP))) {
         _mouseGrabbed=false;
         SDL_Log("OpenUA HUD click entered pointer mode");

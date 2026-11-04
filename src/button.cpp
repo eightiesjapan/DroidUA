@@ -741,7 +741,7 @@ bool NC_STACK_button::AndroidDrawButton(size_t index)
 {
     auto &b=field_d8[index];
     if(Android::InMission() || b.button_type!=TYPE_BUTTON || !(b.flags&FLAG_TEXT) ||
-       !(b.flags&FLAG_BORDER) || (b.button_id>=6000 && b.button_id<=6004)) return false;
+       !(b.flags&FLAG_BORDER) || ((b.button_id>=6000 && b.button_id<=6004) || b.button_id==6008)) return false;
     const int base=GFX::Engine.GetTileset(b.tileset_up)->h;
     int top=std::max(0,std::min(int(b.ypos)-(24-base)/2,int(h)-24));
     int bottom=std::min(int(h),top+24);

@@ -30,6 +30,7 @@ public class OpenUAActivity extends org.libsdl.app.SDLActivity {
             android.widget.Toast.makeText(this,error.getMessage(),android.widget.Toast.LENGTH_LONG).show();
             finish(); return;
         }
+        CrashReports.beginGame(this);
         super.onCreate(state);
         useFullDisplay();
     }
@@ -45,6 +46,9 @@ public class OpenUAActivity extends org.libsdl.app.SDLActivity {
         // must start with fresh native globals next time, rather than reuse them.
         // Home/background pause never finishes the activity and keeps the game alive.
         if (finished) android.os.Process.killProcess(android.os.Process.myPid());
+    }
+    public void showTouchLayoutEditor() {
+        runOnUiThread(()->startActivity(new android.content.Intent(this,TouchLayoutActivity.class)));
     }
     @Override protected String[] getLibraries() { return new String[] { "SDL2", "SDL2_image", "gl4es", "main" }; }
     @Override protected String[] getArguments() {

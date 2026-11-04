@@ -19,7 +19,7 @@ import java.util.concurrent.Executors;
 
 /** Runs separately from SDL, so a clean engine exit can return to this screen. */
 public class LauncherActivity extends Activity {
-    private static final int IMPORT=10, BACKUP=11, RESTORE=12;
+    private static final int IMPORT=10, BACKUP=11, RESTORE=12, DIAGNOSTICS=13;
     private static final int BACKGROUND=Color.rgb(7,18,24), CYAN=Color.rgb(109,220,230), TEXT=Color.rgb(225,239,241);
     private final java.util.concurrent.ExecutorService worker=Executors.newSingleThreadExecutor();
     private final List<Button> actions=new ArrayList<>();
@@ -55,6 +55,8 @@ public class LauncherActivity extends Activity {
             ()->job("Restoring previous saves…",()->GameFiles.undo(files),"Previous saves restored.")));
         content.addView(undo);
         content.addView(button("About & controls",this::about));
+        content.addView(button("Export diagnostics",()->launchPicker(new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("application/zip").putExtra(Intent.EXTRA_TITLE,"DroidUA-report-"+new SimpleDateFormat("yyyy-MM-dd-HHmmss",Locale.ROOT).format(new Date())+".zip"),DIAGNOSTICS)));
         progress=new ProgressBar(this); progress.setVisibility(View.GONE); content.addView(progress);
         status=label("",15,CYAN); status.setPadding(0,dp(12),0,0); content.addView(status);
         refresh();
@@ -65,7 +67,10 @@ public class LauncherActivity extends Activity {
             runOnUiThread(()-> { busy=false; progress.setVisibility(View.GONE); refresh(); });
         });
     }
-    @Override public void onResume() { super.onResume(); if(description!=null) refresh(); }
+    @Override public void onResume() {
+        super.onResume(); if(description!=null) refresh();
+        worker.execute(()-> { String report=CrashReports.collect(this); if(report!=null) runOnUiThread(()->status.setText(report)); });
+    }
     private LinearLayout.LayoutParams weighted() { return new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1); }
     private TextView label(String text,int size,int color) { TextView v=new TextView(this); v.setText(text); v.setTextSize(size); v.setTextColor(color); return v; }
     private Button button(String text,Runnable action) {
@@ -129,7 +134,13 @@ public class LauncherActivity extends Activity {
         super.onActivityResult(request,result,intent);
         if(result!=RESULT_OK || intent==null || intent.getData()==null) return;
         Uri uri=intent.getData();
-        if(request==IMPORT) {
+        if(request==DIAGNOSTICS) {
+            job("Exporting diagnostics…",()-> {
+                try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")) {
+                    if(out==null) throw new IOException("Cannot write to that location."); CrashReports.export(this,out);
+                }
+            },"Diagnostics ZIP saved. You can share this file when reporting a problem.");
+        } else if(request==IMPORT) {
             job("Checking game folder…",()-> {
                 String id=DocumentsContract.getTreeDocumentId(uri);
                 Uri root=DocumentsContract.buildDocumentUriUsingTree(uri,id);
@@ -191,7 +202,10 @@ public class LauncherActivity extends Activity {
             "Gamepad: left stick moves / controls the cursor; right stick looks or pans an open map. R1 switches VIEW / SELECT. L1 clicks and drags; double-click a map vehicle to enter it. L2/R2 fire weapons.\n"+
             "A: pause · B: brake / auto-level / VTOL · X: current squad leader · Y: become squad leader · Select: map · Start: back / game menu.\n\n"+
             "Touch: Move / Cursor and Look / Pan pads; VIEW / SELECT switches modes. Fire / Alt shoot. Tap the original HUD buttons directly; double-tap a map vehicle to enter it. Touch controls and opacity can be changed in game Options.\n\n"+
-            "Backups include campaign profiles, saved progress and settings, not the game assets. Copy the ZIP to another device, import its game files, then choose Restore saves. Export before uninstalling: uninstalling removes private saves and the local undo copy.";
+            "Touch: Brake stops / auto-levels / VTOL; Leader jumps to the squad leader; Lead makes you squad leader. Options > Touch screen opens the draggable layout editor. Reset restores the default layout; Save applies changes. Layouts adapt to screen edges and avoid overlapping buttons.\n\n"+
+            "Backups include campaign profiles, saved progress, settings and your touch layout, not the game assets. Copy the ZIP to another device, import its game files, then choose Restore saves. Export before uninstalling: uninstalling removes private saves and the local undo copy.\n\n"+
+            "Updates: install a newer DroidUA APK over this app using the same signing key. Android offers Update and preserves imported files, saves and settings. Do not uninstall first. Exported backup ZIPs remain wherever you saved them.\n\n"+
+            "Problems: reopen DroidUA after a crash. A report is saved under Download/DroidUA on Android 10 or newer where supported. Export diagnostics also works before importing game files. Reports contain app logs, crash traces and display settings, without your saved progress; nothing is uploaded automatically.";
         showText("About & controls",credits,true);
     }
     private void showText(String title,String text,boolean licencesButton) {

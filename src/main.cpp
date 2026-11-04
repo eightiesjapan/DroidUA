@@ -7,6 +7,10 @@
 #include "system/gfx.h"
 #include "system/inpt.h"
 #include "system/sound.h"
+#ifdef __ANDROID__
+#include "system/android_display.h"
+void UAAndroidInstallCrashHandler();
+#endif
 #include "winp.h"
 #include "wintimer.h"
 
@@ -823,6 +827,7 @@ static int AndroidLifecycle(void *,SDL_Event *event)
         // Exclude sleep time even for a brief background switch below 2 seconds.
         if(Input::Engine._timer) Input::Engine._timer->itimer_func64();
         userdata.ResetInputPeriod=true;
+        Android::ReloadTouchLayout();
         androidSuspended=false;
         SDL_Log("OpenUA resumed at game time %d",ypaworld ? ypaworld->_timeStamp : -1);
     }
@@ -833,6 +838,7 @@ static int AndroidLifecycle(void *,SDL_Event *event)
 int main(int argc, char *argv[])
 {
 #ifdef __ANDROID__
+    UAAndroidInstallCrashHandler();
     // Android activity supplies the writable directory holding imported data.
     for (int i = 1; i + 1 < argc; ++i) {
         if (std::string(argv[i]) == "-android-data") {

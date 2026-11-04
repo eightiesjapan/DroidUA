@@ -17,7 +17,7 @@ public final class GameFiles {
         InputStream open() throws IOException;
     }
     public interface Progress { void update(String message); }
-    private static final String[] PROGRESS={"SAVE","Ghorsave","Taersave","ENV/user.def","android-settings.cfg"};
+    private static final String[] PROGRESS={"SAVE","Ghorsave","Taersave","ENV/user.def","android-settings.cfg","android-touch-layout.cfg"};
     private static final String META="droidua-backup.properties";
     private static final long BACKUP_LIMIT=512L*1024*1024, IMPORT_LIMIT=4L*1024*1024*1024;
     private static final Set<String> IMPORT_DIRS=new HashSet<>(Arrays.asList(
@@ -199,7 +199,7 @@ public final class GameFiles {
                 }
                 if(!allowed(name)) throw new IOException("The backup contains unexpected files. Choose a DroidUA save backup ZIP.");
                 if(entry.isDirectory()) {
-                    if(name.equals("ENV/user.def") || name.equals("android-settings.cfg")) throw new IOException("A settings file is a folder in this backup.");
+                    if(name.equals("ENV/user.def") || name.endsWith(".cfg")) throw new IOException("A settings file is a folder in this backup.");
                     mkdir(target);
                 }
                 else {
