@@ -9,6 +9,8 @@ bool UAAndroidMapIsTarget(const TClickBoxInf &input);
 bool UAAndroidMapIsOpen();
 bool UAAndroidModalIsOpen();
 bool UAAndroidCreationIsActive();
+bool UAAndroidMapOrSquadShown();
+bool UAAndroidHudBusy();
 void UAAndroidPanMap(float x,float y);
 #include "system/gfx.h"
 #include "system/system.h"
@@ -271,6 +273,29 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
         if (gesture.down) input->ClickInf.flag |= TClickBoxInf::FLAG_RM_DOWN;
         if (gesture.hold) input->ClickInf.flag |= TClickBoxInf::FLAG_RM_HOLD;
         if (gesture.up) input->ClickInf.flag |= TClickBoxInf::FLAG_RM_UP;
+    }
+    // Closing the map / squad manager (in a vehicle or the host station)
+    // returns to VIEW once the map, squad manager and creation are all closed.
+    // The switch waits until no finger / mouse button is held and no click is
+    // being processed, so the tap that closed the window (e.g. the bottom-bar
+    // map icon, which counts as a HUD click) cannot undo it.
+    {
+        static bool wasShown=false, pendingView=false;
+        static int quietFrames=0;
+        const bool shown=playing && UAAndroidMapOrSquadShown();
+        if(playing && wasShown && !shown) { pendingView=true; quietFrames=0; }
+        if(!playing || shown || modal || grabbed || UAAndroidHudBusy()) pendingView=false;
+        const bool clicking=manualTouchHeld || leftClick ||
+            (input->ClickInf.flag & (TClickBoxInf::FLAG_LM_DOWN|TClickBoxInf::FLAG_LM_HOLD|TClickBoxInf::FLAG_LM_UP|
+                                     TClickBoxInf::FLAG_BTN_DOWN|TClickBoxInf::FLAG_BTN_HOLD|TClickBoxInf::FLAG_BTN_UP));
+        if(pendingView) {
+            quietFrames=clicking ? 0 : quietFrames+1;
+            if(quietFrames>=2) {
+                grabbed=true; pendingView=false;
+                SDL_Log("OpenUA map/squad closed: VIEW mode");
+            }
+        }
+        wasShown=shown;
     }
     touchPointer=!grabbed;
     if (playing && !modal && (mapPanX || mapPanY))
