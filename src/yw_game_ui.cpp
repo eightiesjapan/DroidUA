@@ -11257,9 +11257,11 @@ void NC_STACK_ypaworld::ypaworld_func64__sub1(TInputState *inpt)
 
         inpt->Sliders[0] += inpt->Sliders[10];
 #ifdef __ANDROID__
-        if (Android::InvertLook()) inpt->Sliders[11] = -inpt->Sliders[11]; // vertical only
-#endif
+        // Invert Look: flight pitch only (the tank gun already aims up with up).
+        inpt->Sliders[1] += Android::InvertLook() ? -inpt->Sliders[11] : inpt->Sliders[11];
+#else
         inpt->Sliders[1] += inpt->Sliders[11];
+#endif
         inpt->Sliders[3] += inpt->Sliders[10];
         inpt->Sliders[5] -= inpt->Sliders[11] * 1.5;
 
