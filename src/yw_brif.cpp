@@ -620,17 +620,108 @@ void ypaworld_func158__sub4__sub1__sub4__sub21(NC_STACK_ypaworld *yw, TInputStat
     }
 }
 
+// The briefing texts were wrapped by hand for the 1998 bitmap font; the TTF
+// font used now is wider, so some lines ran past the panel and were cut off at
+// the screen edge. Keep the authored line breaks, but when a line is too wide
+// carry its overflow words onto the start of the next line (never into a blank
+// line, an indented line or a "--" attribution), wrapping again as needed.
+static std::string WrapBriefingText(const std::string &text, int width)
+{
+    TTF_Font *font = GFX::Engine._font.ttfFont;
+    if (!font || width <= 0)
+        return text;
+
+    auto fits = [&](const std::string &str) {
+        int w = 0, h = 0;
+        TTF_SizeUTF8(font, str.c_str(), &w, &h);
+        return w <= width;
+    };
+
+    std::vector<std::string> in;
+    size_t st = 0;
+    while (true)
+    {
+        size_t p = text.find_first_of("\n\r", st);
+        in.push_back(text.substr(st, p == std::string::npos ? std::string::npos : p - st));
+        if (p == std::string::npos) break;
+        st = p + 1;
+    }
+
+    std::vector<std::string> out;
+    std::string carry;
+    // Emits the part of `line` that fits; any overflow is left in `carry`.
+    auto emitWrapped = [&](std::string line) {
+        carry.clear();
+        if (fits(line)) { out.push_back(line); return; }
+        size_t cut = std::string::npos, sp = line.find(' ');
+        while (sp != std::string::npos && fits(line.substr(0, sp)))
+        {
+            cut = sp;
+            sp = line.find(' ', sp + 1);
+        }
+        if (cut == std::string::npos) { out.push_back(line); return; } // one very long word
+        out.push_back(line.substr(0, cut));
+        carry = line.substr(cut + 1);
+        while (!carry.empty() && carry.front() == ' ') carry.erase(0, 1);
+    };
+    auto flushCarry = [&]() {
+        while (!carry.empty()) { std::string c = carry; emitWrapped(c); }
+    };
+
+    for (const std::string &src : in)
+    {
+        std::string line = src;
+        const size_t first = line.find_first_not_of(' ');
+        const bool keepAlone = first == std::string::npos || first > 0 || line.compare(first, 2, "--") == 0;
+        if (!carry.empty())
+        {
+            if (keepAlone)
+                flushCarry();
+            else
+            {
+                // authored lines often end with a space before the break: avoid double spaces
+                std::string c = carry;
+                while (!c.empty() && c.back() == ' ') c.pop_back();
+                line = c + " " + line;
+            }
+        }
+        emitWrapped(line);
+    }
+    flushCarry();
+
+    std::string res;
+    for (size_t i = 0; i < out.size(); ++i)
+    {
+        if (i) res += '\n';
+        res += out[i];
+    }
+    return res;
+}
+
 void sub_4ED434(NC_STACK_ypaworld *yw, TBriefengScreen *brf)
 {
     stru_5C91D0.itemBlock.clear();
 
     if ( brf->TextTime > 0 )
     {
+        // Wrap to the panel's text width (list width minus scrollbar), cached.
+        static std::string cachedSrc, cachedText;
+        static int cachedWidth = -1;
+        static TTF_Font *cachedFont = NULL;
+        const int wrapWidth = stru_5C91D0.entryWidth - yw->_fontVBScrollW - 2 * yw->_fontBorderW - 4;
+        if (cachedSrc != brf->BriefingText || cachedWidth != wrapWidth || cachedFont != GFX::Engine._font.ttfFont)
+        {
+            cachedSrc = brf->BriefingText;
+            cachedWidth = wrapWidth;
+            cachedFont = GFX::Engine._font.ttfFont;
+            cachedText = WrapBriefingText(brf->BriefingText, wrapWidth);
+        }
+        const std::string &briefingText = cachedText;
         int numLines = 1;
-		size_t pos = brf->BriefingText.find_first_of("\n\r");
+		size_t pos = briefingText.find_first_of("\n\r");
         while( pos != std::string::npos )
         {
-        	pos = brf->BriefingText.find_first_of("\n\r", pos + 1);
+        	pos = briefingText.find_first_of("\n\r", pos + 1);
             numLines++;
         }
 
@@ -650,18 +741,18 @@ void sub_4ED434(NC_STACK_ypaworld *yw, TBriefengScreen *brf)
             bool endline = false;
 
             size_t stpos = pos;
-            pos = brf->BriefingText.find_first_of("\n\r", stpos);
+            pos = briefingText.find_first_of("\n\r", stpos);
 
             std::string line;
 
             if (pos == std::string::npos)
             {
                 endline = true;
-                line = brf->BriefingText.substr(stpos);
+                line = briefingText.substr(stpos);
             }
             else
             {
-                line = brf->BriefingText.substr(stpos, pos - stpos);
+                line = briefingText.substr(stpos, pos - stpos);
                 pos++;
             }
 

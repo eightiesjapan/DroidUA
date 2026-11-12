@@ -5,6 +5,10 @@
 #include "inivals.h"
 #include "winp.h"
 
+#ifdef __ANDROID__
+class ClickBox;
+void UAAndroidOverrideButton(ClickBox *box, int boxX, int boxY, int &buttonId);
+#endif
 namespace Input{
 
 INPEngine INPEngine::Instance;
@@ -1046,6 +1050,9 @@ void INPEngine::TClickCheck::GetClick(TClickBoxInf *click, TMousePos &mouse)
                     break;
                 }
             }
+#ifdef __ANDROID__
+            UAAndroidOverrideButton(box, mouse.BoxPos.x, mouse.BoxPos.y, click->selected_btnID);
+#endif
             break;
         }
     }

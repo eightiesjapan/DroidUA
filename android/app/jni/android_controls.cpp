@@ -8,6 +8,7 @@
 bool UAAndroidMapIsTarget(const TClickBoxInf &input);
 bool UAAndroidMapIsOpen();
 bool UAAndroidModalIsOpen();
+bool UAAndroidCreationIsActive();
 void UAAndroidPanMap(float x,float y);
 #include "system/gfx.h"
 #include "system/system.h"
@@ -23,11 +24,20 @@ bool touchPlaying=false, touchPointer=false, manualTouchHeld=false, releaseTouch
 Uint32 currentButtons=0, touchPressedLatch=0;
 Uint32 currentActions=0, previousActions=0, pendingHotkeys=0;
 bool selectPressed=false;
+int dpadStep=0; // -1 previous / +1 next entry in the creation list
 
 float mapPanX=0,mapPanY=0;
 std::array<AndroidTouch::Control,AndroidTouch::Count> TouchLayout() {
+    // Touch controls keep their own physical size: they are laid out in a
+    // virtual 480-high (Standard HUD) or 400-high (Large / Extra large HUD)
+    // space and scaled to the current logical screen, so Extra large enlarges
+    // only the game HUD, not the touch controls.
     auto size=GFX::Engine.GetScreenSize();
-    return AndroidTouch::Layout(size.x,size.y,touchPointer,UAAndroidMapIsOpen(),&Android::TouchConfiguration());
+    const float virtualH=Android::HudSize()==0 ? 480.0f : 400.0f;
+    const float k=size.y>0 ? float(size.y)/virtualH : 1.0f;
+    auto controls=AndroidTouch::Layout(size.x/k,virtualH,touchPointer,UAAndroidMapIsOpen(),&Android::TouchConfiguration());
+    for(auto &c:controls) { c.x*=k; c.y*=k; c.r*=k; c.hh*=k; }
+    return controls;
 }
 void TouchAxes(float &lx,float &ly,float &rx,float &ry,Uint32 &buttons) {
     if(!touchPlaying) {
@@ -49,13 +59,20 @@ void TouchAxes(float &lx,float &ly,float &rx,float &ry,Uint32 &buttons) {
     for(const auto &entry:fingers) {
         int c=entry.second.control;
         if(c<0) continue;
-        if(c<2) {
+        if(c==0) {
+            // MOVE slider: forward/back only, springs back to centre on release.
+            const float travel=std::max(1.0f,AndroidTouch::Straight(layout[0]));
+            float y=(entry.second.y-layout[0].y)/travel;
+            y=std::max(-1.0f,std::min(1.0f,y));
+            if(std::fabs(y)<.12f) y=0;
+            lx=0; ly=y;
+        } else if(c==1) {
             float x=(entry.second.x-layout[c].x)/layout[c].r;
             float y=(entry.second.y-layout[c].y)/layout[c].r;
             float length=std::sqrt(x*x+y*y);
             if(length>1) {x/=length; y/=length;}
             if(length<.12f) x=y=0;
-            if(c==0) {lx=x; ly=y;} else {rx=x; ry=y;}
+            rx=x; ry=y;
         } else buttons |= AndroidControls::Bit(AndroidTouch::Action(c));
     }
 }
@@ -176,7 +193,9 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
         mapPanY=std::max(-1.0f,std::min(1.0f,axis(SDL_CONTROLLER_AXIS_RIGHTY)+(!grabbed?touchRY:0)));
         lookX=grabbed?touchRX:0; lookY=grabbed?touchRY:0;
     }
-    if (pointer && (moveX || moveY)) {
+    // In missions the left stick / MOVE slider only drives; the cursor is moved
+    // by touch (or a mouse). Outside missions it still navigates the menus.
+    if (!playing && pointer && (moveX || moveY)) {
         static float x = 320, y = 240;
         static Common::Point last;
         if (_mPos != last) { x = _mPos.x; y = _mPos.y; }
@@ -209,10 +228,16 @@ void NC_STACK_winp::AndroidPoll(bool playing, bool &grabbed)
         down(SDL_CONTROLLER_BUTTON_LEFTSHOULDER)||down(SDL_CONTROLLER_BUTTON_A),leftClick);
     std::map<int, bool> keys;
     keys[Input::KC_ESCAPE] = down(SDL_CONTROLLER_BUTTON_START) || (!playing && down(SDL_CONTROLLER_BUTTON_B));
-    keys[Input::KC_Q] = playing && down(SDL_CONTROLLER_BUTTON_DPAD_UP);
-    keys[Input::KC_W] = playing && down(SDL_CONTROLLER_BUTTON_DPAD_DOWN);
-    keys[Input::KC_F1] = playing && down(SDL_CONTROLLER_BUTTON_DPAD_LEFT);
-    keys[Input::KC_F4] = playing && down(SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+    // D-pad up/down steps through the vehicle/building list while creation is
+    // open (auto-repeats when held); otherwise the D-pad is unused in missions.
+    {
+        static Uint32 repeatAt=0;
+        const int dir=down(SDL_CONTROLLER_BUTTON_DPAD_UP) ? -1 : (down(SDL_CONTROLLER_BUTTON_DPAD_DOWN) ? 1 : 0);
+        const bool edge=pressed(SDL_CONTROLLER_BUTTON_DPAD_UP) || pressed(SDL_CONTROLLER_BUTTON_DPAD_DOWN);
+        if(!playing || !dir) repeatAt=0;
+        else if(edge) { dpadStep=dir; repeatAt=now+380; }
+        else if(repeatAt && now>=repeatAt) { dpadStep=dir; repeatAt=now+140; }
+    }
     for (const auto &key : keys) {
         if (key.second && !previousKeys[key.first]) KeyDown(key.first);
         if (!key.second && previousKeys[key.first]) KeyUp(key.first);
@@ -254,20 +279,28 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
     // Semantic actions bypass profile keyboard bindings. Fixed Start/Select and
     // desktop/mouse keyboard behavior remain separate from remappable buttons.
     using namespace AndroidControls;
-    if(!modal && selectPressed) input->HotKeyID=8;
+    // Vehicle creation (gamepad A by default) also leaves VIEW mode so the
+    // chosen vehicle can be placed with the pointer.
+    if(!modal && (pendingHotkeys&Bit(Create))) grabbed=false;
+    if(!modal && dpadStep && UAAndroidCreationIsActive()) { input->HotKeyID=dpadStep<0 ? 29 : 28; dpadStep=0; }
+    else if(!modal && selectPressed) input->HotKeyID=8;
     else if(!modal) for(int action=1;action<ActionCount;++action) if(pendingHotkeys&Bit(action)) {
         input->HotKeyID=Hotkey(action);pendingHotkeys&=~Bit(action);break;
     }
     if(modal) pendingHotkeys=0;
+    dpadStep=0;
     if(!modal && (currentActions&Bit(Brake))) input->Buttons.Set(3);
     // Disable desktop joystick expressions; those assume a flight-stick throttle.
     for (int i = 12; i <= 16; ++i) input->Sliders[i] = 0;
+    if (!modal) {
+        // MOVE drives forward/back in both VIEW and SELECT mode.
+        input->Sliders[2] -= moveY;
+        input->Sliders[4] -= moveY;
+    }
     if (grabbed && !modal) {
         input->Sliders[0] += lookX;
         input->Sliders[1] += lookY;
-        input->Sliders[2] -= moveY;
         input->Sliders[3] += lookX;
-        input->Sliders[4] -= moveY;
         input->Sliders[5] -= lookY * 1.5f;
         // Physical triggers and touch Fire/Alt are independent of A/B hotkeys.
         if(currentActions&Bit(Fire)) input->Buttons.Set(0);
@@ -333,8 +366,13 @@ void NC_STACK_winp::AndroidCollectTouchControls(std::vector<AndroidTouchItem> &i
         bool held=false; float fx=c.x,fy=c.y;
         for(const auto &f:fingers) if(f.second.control==i) {held=true;fx=f.second.x;fy=f.second.y;}
         AndroidTouchItem it;
-        it.x=c.x; it.y=c.y; it.r=c.r; it.pad=i<2; it.held=held; it.knobX=c.x; it.knobY=c.y;
-        if(it.pad && held) {
+        it.x=c.x; it.y=c.y; it.r=c.r; it.hh=c.hh; it.pad=i<2; it.held=held; it.knobX=c.x; it.knobY=c.y;
+        if(i==0) {
+            if(held) {
+                const float t=AndroidTouch::Straight(c);
+                it.knobY=std::max(c.y-t,std::min(c.y+t,fy));
+            }
+        } else if(it.pad && held) {
             float dx=fx-c.x,dy=fy-c.y,length=std::sqrt(dx*dx+dy*dy);
             if(length>c.r*.65f) {dx*=c.r*.65f/length;dy*=c.r*.65f/length;}
             it.knobX=c.x+dx; it.knobY=c.y+dy;

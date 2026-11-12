@@ -7,7 +7,11 @@ class NC_STACK_button;
 namespace AndroidTouch { struct Config; }
 namespace AndroidControls { struct Config; }
 namespace Android {
-struct Settings { int layout=0, large=0, fps=60, touch=0, showFPS=0, touchOpacity=75; };
+// large: menu size (Standard/Large). hud: in-mission HUD size
+// (0 Standard, 1 Large, 2 Extra large); touch controls follow hud but stay
+// the same size for Large and Extra large.
+struct Settings { int layout=0, large=0, fps=60, touch=0, showFPS=0, touchOpacity=75, hud=-1; };
+int HudSize();
 void LoadSettings();
 void ReloadControls();
 const AndroidTouch::Config &TouchConfiguration();

@@ -19,6 +19,9 @@
 #include "env.h"
 #include "system/inivals.h"
 #include "locale/locale.h"
+#ifdef __ANDROID__
+bool UAAndroidHudBusy();
+#endif
 
 extern yw_infolog info_log;
 
@@ -6842,9 +6845,10 @@ void NC_STACK_ypaworld::setYW_userVehicle(NC_STACK_ypabact *bact)
 
         _userUnit = bact;
 #ifdef __ANDROID__
-        // Taking control of a vehicle should immediately make the sticks drive/aim.
-        // Returning to the host keeps its existing command/pointer behaviour.
-        if(oldpBact && bact != _userRobo && bact->_status != BACT_STATUS_DEAD)
+        // Taking control of a vehicle, or returning to the host station, makes
+        // the controls drive/aim immediately (VIEW mode) - unless the map, squad
+        // manager or vehicle creation is in use.
+        if(oldpBact && bact->_status != BACT_STATUS_DEAD && (bact != _userRobo || !UAAndroidHudBusy()))
             _mouseGrabbed = true;
 #endif
 

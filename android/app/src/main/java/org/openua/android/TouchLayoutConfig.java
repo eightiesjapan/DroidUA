@@ -6,7 +6,7 @@ import java.util.*;
 /** Versioned edge-relative format shared with android_touch_layout.h. */
 public final class TouchLayoutConfig {
     public static final int COUNT=14;
-    public static final String[] NAMES={"Move / Cursor","Look / Pan","Fire weapon","Alt weapon","VIEW / SELECT","Brake / auto-level / VTOL",
+    public static final String[] NAMES={"Move (forward / back slider)","Look / Pan","Fire weapon","Alt weapon","VIEW / SELECT","Brake / auto-level / VTOL",
         "Leader: jump to squad leader","Lead: become squad leader","+: map zoom in","-: map zoom out","Unit: cycle units / host turrets",
         "Squad: cycle squad leaders","A1: aggression level 1","A5: aggression level 5"};
     public boolean custom=false;
@@ -15,8 +15,13 @@ public final class TouchLayoutConfig {
     public final float[] edge=new float[COUNT],bottom=new float[COUNT];
     public TouchLayoutConfig() { for(int i=0;i<COUNT;++i) enabled[i]=i<8; }
     public static final class Control {
-        public float x,y,r; public final String label;public boolean enabled=true;
+        /** r: radius, or half-width of the vertical MOVE slider (hh = half-height). */
+        public float x,y,r,hh; public final String label;public boolean enabled=true;
         Control(float x,float y,float r,String label) {this.x=x;this.y=y;this.r=r;this.label=label;}
+        public float extent() { return Math.max(r,hh); }
+        public float straight() { return Math.max(0,hh-r); }
+        /** Distance from (px,py) to this control's centre line (0 inside the straight part). */
+        public float distance(float px,float py) { float dx=px-x,dy=Math.max(0,Math.abs(py-y)-straight());return (float)Math.sqrt(dx*dx+dy*dy); }
     }
     public static TouchLayoutConfig load(File file) {
         try(InputStream in=new FileInputStream(file)) {return read(in);}
@@ -58,22 +63,24 @@ public final class TouchLayoutConfig {
         right[i]=x>w/2?1:0;edge[i]=Math.max(0,Math.min(4,(right[i]==1?w-x:x)/h));bottom[i]=Math.max(0,Math.min(1,(h-y)/h));
     }
     public Control[] layout(float w,float h) {
-        Control[] c={new Control(70,h-90,48,"Move"),new Control(w-70,h-90,48,"Look"),new Control(65,h-175,25,"Fire"),
-            new Control(135,h-150,25,"Alt"),new Control(w-155,h-65,25,"Mode"),new Control(155,h-65,25,"Brake"),
-            new Control(w-135,h-150,25,"Leader"),new Control(w-65,h-175,25,"Lead"),
+        // Mirrors android_touch_layout.h: slim MOVE slider with Fire / Alt / Brake beside it.
+        Control[] c={new Control(41,h-122,24,"Move"),new Control(w-65,h-90,48,"Look"),new Control(103,h-178,25,"Fire"),
+            new Control(103,h-122,25,"Alt"),new Control(w-150,h-65,25,"Mode"),new Control(103,h-66,25,"Brake"),
+            new Control(w-130,h-150,25,"Leader"),new Control(w-60,h-175,25,"Lead"),
             new Control(40,85,25,"+"),new Control(100,85,25,"-"),new Control(160,85,25,"Unit"),
             new Control(w-160,85,25,"Squad"),new Control(w-100,85,25,"A1"),new Control(w-40,85,25,"A5")};
+        c[0].hh=72;
         for(int i=0;i<COUNT;++i) {
             c[i].enabled=enabled[i];
             if(custom && (i<8 || edge[i]!=0 || bottom[i]!=0)) {c[i].x=right[i]==1?w-edge[i]*h:edge[i]*h;c[i].y=h-bottom[i]*h;}
-            c[i].x=Math.max(c[i].r+8,Math.min(w-c[i].r-8,c[i].x));c[i].y=Math.max(c[i].r+44,Math.min(h-c[i].r-40,c[i].y));
+            c[i].x=Math.max(c[i].r+8,Math.min(w-c[i].r-8,c[i].x));c[i].y=Math.max(c[i].extent()+44,Math.min(h-c[i].extent()-40,c[i].y));
         }
         boolean[] placed=new boolean[COUNT];
         for(int pass=0;pass<2;++pass) for(int i=0;i<COUNT;++i) {
             if(c[i].enabled!=(pass==0)) continue;
             if(!free(c,placed,i,c[i].x,c[i].y)) {
                 float best=Float.MAX_VALUE,bx=c[i].x,by=c[i].y;
-                for(float y=c[i].r+44;y<=h-c[i].r-40;y+=8) for(float x=c[i].r+8;x<=w-c[i].r-8;x+=8) {
+                for(float y=c[i].extent()+44;y<=h-c[i].extent()-40;y+=8) for(float x=c[i].r+8;x<=w-c[i].r-8;x+=8) {
                     float dx=x-c[i].x,dy=y-c[i].y,cost=dx*dx+dy*dy;
                     if(cost<best && free(c,placed,i,x,y)) {best=cost;bx=x;by=y;}
                 }
@@ -84,6 +91,10 @@ public final class TouchLayoutConfig {
         return c;
     }
     private static boolean free(Control[] c,boolean[] placed,int i,float x,float y) {
-        for(int j=0;j<COUNT;++j) if(placed[j]) {float dx=x-c[j].x,dy=y-c[j].y,gap=c[i].r+c[j].r+6;if(dx*dx+dy*dy<gap*gap) return false;}return true;
+        for(int j=0;j<COUNT;++j) if(placed[j]) {
+            float dx=x-c[j].x,dy=Math.max(0,Math.abs(y-c[j].y)-c[i].straight()-c[j].straight()),gap=c[i].r+c[j].r+6;
+            if(dx*dx+dy*dy<gap*gap) return false;
+        }
+        return true;
     }
 }

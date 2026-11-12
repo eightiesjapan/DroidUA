@@ -6,7 +6,7 @@ import java.util.*;
 /** Numeric action IDs match AndroidControls::Action. Start/Select cannot be remapped. */
 public final class GamepadConfig {
     public static final String[] BUTTONS={"A","B","X","Y","L1","L2","R1","R2","L3 (left stick click)","R3 (right stick click)"};
-    public static final String[] ACTIONS={"Unused","Pause game","Brake / auto-level / VTOL","Jump to current squad leader","Become squad leader",
+    public static final String[] ACTIONS={"Unused","Vehicle creation: open / close","Brake / auto-level / VTOL","Jump to current squad leader","Become squad leader",
         "Mouse left-click / drag","Switch VIEW / SELECT","Fire weapon","Fire alternate weapon",
         "Map: zoom in (+)","Map: zoom out (-)","Cycle units / host gun turrets (F6)","Cycle squad leaders (F7)",
         "Squad aggression level 1","Squad aggression level 5","Open / close map","Open game menu"};

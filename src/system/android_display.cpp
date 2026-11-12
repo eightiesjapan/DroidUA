@@ -11,6 +11,7 @@
 #include <fstream>
 #include <cstdio>
 #include <memory>
+#include <algorithm>
 #include <atomic>
 #include "../../android/app/jni/android_touch_layout.h"
 
@@ -98,13 +99,16 @@ void LoadSettings() {
         if(key=="touch" && value>=0 && value<=2) settings.touch=value;
         if(key=="touchOpacity" && value>=10 && value<=100) settings.touchOpacity=value;
         if(key=="showFPS" && value>=0 && value<=1) settings.showFPS=value;
+        if(key=="hud" && value>=0 && value<=2) settings.hud=value;
     }
+    if(settings.hud<0) settings.hud=settings.large; // older files: HUD followed Interface size
     draft=settings;
 }
 static void RefreshMenu(NC_STACK_button *menu) {
     const char *touch[]={"Automatic","Show","Hide"};
     menu->SetText(6000, draft.layout ? "Original 4:3" : "Automatic");
     menu->SetText(6001, draft.large ? "Large" : "Standard");
+    menu->SetText(6010, draft.hud==2 ? "Extra large" : (draft.hud==1 ? "Large" : "Standard"));
     menu->SetText(6002, draft.fps==30 ? "30 FPS" : "60 FPS");
     menu->SetText(6003, touch[draft.touch]);
     menu->SetText(6004, draft.showFPS ? "On" : "Off");
@@ -121,6 +125,7 @@ bool CycleSetting(int event, NC_STACK_button *menu) {
     switch(event) {
     case 6100: draft.layout=!draft.layout; break;
     case 6101: draft.large=!draft.large; break;
+    case 6110: draft.hud=(draft.hud+1)%3; break;
     case 6102: draft.fps=draft.fps==60 ? 30 : 60; break;
     case 6103: draft.touch=(draft.touch+1)%3; break;
     case 6104: draft.showFPS=!draft.showFPS; break;
@@ -134,12 +139,12 @@ bool CycleSetting(int event, NC_STACK_button *menu) {
     RefreshMenu(menu); return true;
 }
 bool ApplySettings() {
-    bool resize=settings.layout!=draft.layout || settings.large!=draft.large;
+    bool resize=settings.layout!=draft.layout || settings.large!=draft.large || settings.hud!=draft.hud;
     settings=draft;
     std::ofstream out("android-settings.cfg.tmp",std::ios::trunc);
     out << "layout "<<settings.layout<<"\nlarge "<<settings.large<<"\nfps "<<settings.fps
         <<"\ntouch "<<settings.touch<<"\nshowFPS "<<settings.showFPS
-        <<"\ntouchOpacity "<<settings.touchOpacity<<"\n";
+        <<"\ntouchOpacity "<<settings.touchOpacity<<"\nhud "<<settings.hud<<"\n";
     out.close();
     if (!out.fail()) std::rename("android-settings.cfg.tmp","android-settings.cfg");
     else SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Could not save Android display settings");
@@ -175,20 +180,35 @@ void ConfigureMenu(NC_STACK_button *menu) {
         b.txt_r=button ? 220 : 80; b.txt_g=button ? 240 : 190; b.txt_b=button ? 240 : 190;
         menu->Add(&b);
     };
-    // Row eight was freed by removing desktop-only cursor/window options.
-    for(size_t i=0;i<menu->field_d8.size();++i) if((menu->field_d8[i].ypos+step/2)/step==7) {
-        menu->field_d8[i].ypos+=step; menu->buttons[i].y+=step;
+    // Rows 0-8: Android settings. Horizon Depth, Sky and Stereo Reverse are
+    // removed (kept at their defaults); Enemy Indicators joins Music on row 9
+    // and the three sliders move up one row.
+    for(int i=int(menu->field_d8.size())-1;i>=0;--i) {
+        // Remove by position: checkbox captions share generic button ids.
+        // Row 7 = Horizon Depth + Sky; right half of row 10 = Stereo Reverse.
+        const auto &bb=menu->field_d8[i];
+        const int row=(bb.ypos+step/2)/step;
+        if(row==7 || (row==10 && bb.xpos>=musicColumn)) {
+            if(menu->field_d8[i].field_41C) delete menu->field_d8[i].field_41C;
+            menu->field_d8.erase(menu->field_d8.begin()+i);
+            menu->buttons.erase(menu->buttons.begin()+i);
+            --menu->idd;
+        }
+    }
+    for(size_t i=0;i<menu->field_d8.size();++i) {
+        const int row=(menu->field_d8[i].ypos+step/2)/step;
+        if(row>=10 && row<=13) { menu->field_d8[i].ypos-=step; menu->buttons[i].y-=step; }
     }
     add(6050,0,"ANDROID DISPLAY",false);
-    const char *labels[]={"Screen layout","Interface size","Frame rate","Show FPS","Touch controls","Touch screen"};
-    const int ids[]={0,1,2,4,3,8};
-    for(int i=0;i<6;++i) { add(6060+ids[i],i+1,labels[i],false); add(6000+ids[i],i+1,ids[i]==8?"Edit layout":"...",true); }
-    add(6065,7,"Touch opacity",false);
+    const char *labels[]={"Screen layout","Menu size","HUD size","Frame rate","Show FPS","Touch controls","Touch screen"};
+    const int ids[]={0,1,10,2,4,3,8};
+    for(int i=0;i<7;++i) { add(6060+ids[i],i+1,labels[i],false); add(6000+ids[i],i+1,ids[i]==8?"Edit layout":"...",true); }
+    add(6065,8,"Touch opacity",false);
     NC_STACK_button::Slider opacity={};
     opacity.min=10; opacity.max=100; opacity.value=draft.touchOpacity;
     NC_STACK_button::button_64_arg b={};
     b.button_type=NC_STACK_button::TYPE_SLIDER; b.button_id=6005;
-    b.xpos=contentWidth/2; b.ypos=7*step; b.width=contentWidth/2;
+    b.xpos=contentWidth/2; b.ypos=8*step; b.width=contentWidth/2;
     b.caption=" "; b.tileset_up=18; b.tileset_down=18; b.field_3A=30;
     b.downCode=6105; b.pressedCode=6106; b.upCode=6107; b.field_34=&opacity;
     menu->Add(&b);
@@ -199,6 +219,7 @@ bool InMission() { return mission; }
 int FrameRate() { return settings.fps; }
 void SetControllerPresent(bool present) { controller=present; }
 int TouchOpacity() { return settings.touchOpacity; }
+int HudSize() { return std::max(0,std::min(2,settings.hud)); }
 bool TouchEnabled() { return mission && (settings.touch==1 || (settings.touch==0 && !controller)); }
 bool TouchVisible() { return TouchEnabled() && !UAAndroidUnitMenuIsOpen() && !(mission && UAAndroidModalIsOpen()); }
 SDL_Rect Viewport() {
@@ -209,7 +230,9 @@ SDL_Rect Viewport() {
 }
 Common::Point LogicalSize() {
     SDL_Rect r=Viewport();
-    int height=settings.large ? 400 : 480;
+    // Menus follow Menu size; missions follow HUD size (Extra large = 360).
+    static const int hudHeights[3]={480,400,360};
+    int height=mission ? hudHeights[std::max(0,std::min(2,settings.hud))] : (settings.large ? 400 : 480);
     return Common::Point(AndroidDisplay::LogicalWidth({r.x,r.y,r.w,r.h},height),height);
 }
 Common::Point WindowPoint(Common::Point point) {

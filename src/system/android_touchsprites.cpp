@@ -77,6 +77,19 @@ void GlowArc(Canvas &c, float cx, float cy, float radius, float width)
         }
 }
 
+// Same as Disc but for a vertical capsule (straight part of half-length `st`).
+template <class ColorFn>
+void Capsule(Canvas &c, float cx, float cy, float radius, float st, ColorFn color)
+{
+    if (radius <= 0) return;
+    for (int y = 0; y < c.h; ++y)
+        for (int x = 0; x < c.w; ++x) {
+            const float dx = x + 0.5f - cx, dy = std::max(0.0f, std::fabs(y + 0.5f - cy) - st);
+            const float a = Cover(radius, std::sqrt(dx * dx + dy * dy));
+            if (a > 0) { float r, g, b; color(y + 0.5f, r, g, b); c.Over(x, y, r, g, b, a); }
+        }
+}
+
 struct LabelFont { TTF_Font *fill = nullptr, *outline = nullptr; int outlinePx = 0; };
 LabelFont &FontFor(int size, int outlinePx)
 {
@@ -121,6 +134,51 @@ Sprite Control(float radius, float scale, bool pad, bool held)
     Disc(c, cx, cy, radius - 2.0f * scale, Bevel(cy, radius, held)); // bevel body
     if (pad) Disc(c, cx, cy, radius * 0.55f, Solid(10, 22, 28));     // recessed well
     GlowArc(c, cx, cy, radius - 2.0f * scale, std::max(1.5f, 1.4f * scale));
+    return c.Finish();
+}
+
+Sprite Slider(float halfW, float halfH, float scale, bool held)
+{
+    const int w = int(std::ceil(halfW * 2)) + 4, h = int(std::ceil(halfH * 2)) + 4;
+    Canvas c(w, h);
+    const float cx = w / 2.0f, cy = h / 2.0f, st = std::max(0.0f, halfH - halfW);
+    Capsule(c, cx, cy, halfW, st, Solid(8, 14, 18));                       // dark rim
+    Capsule(c, cx, cy, halfW - 1.0f * scale, st, Solid(120, 153, 159));    // steel edge
+    Capsule(c, cx, cy, halfW - 2.0f * scale, st, Bevel(cy, halfH, held));  // bevel body
+    Capsule(c, cx, cy, halfW * 0.32f, st, Solid(10, 22, 28));              // groove
+    for (int y = int(cy - 0.7f * scale); y <= int(cy + 0.7f * scale); ++y)  // centre (neutral) mark
+        for (int x = int(cx - halfW * 0.55f); x <= int(cx + halfW * 0.55f); ++x)
+            c.Over(x, y, C(60), C(150), C(165), 0.9f);
+    GlowArc(c, cx, cy + st, halfW - 2.0f * scale, std::max(1.5f, 1.4f * scale));
+    return c.Finish();
+}
+
+Sprite Grip(float size, float scale)
+{
+    const int n = int(std::ceil(size)) + 2;
+    Canvas c(n, n);
+    const float r = 4.0f * scale; // rounded corner
+    auto inside = [&](float x, float y, float inset) {
+        const float x0 = inset, y0 = inset, x1 = size - inset, y1 = size - inset;
+        const float qx = std::max(std::max(x0 + r - x, x - (x1 - r)), 0.0f);
+        const float qy = std::max(std::max(y0 + r - y, y - (y1 - r)), 0.0f);
+        return Cover(r, std::sqrt(qx * qx + qy * qy));
+    };
+    for (int y = 0; y < n; ++y)
+        for (int x = 0; x < n; ++x) {
+            const float px = x + 0.5f, py = y + 0.5f;
+            c.Over(x, y, C(8), C(14), C(18), inside(px, py, 0));
+            c.Over(x, y, C(120), C(153), C(159), inside(px, py, 1.0f * scale));
+            const float t = py / size;
+            c.Over(x, y, C(int(78 - 50 * t)), C(int(112 - 70 * t)), C(int(120 - 72 * t)), inside(px, py, 2.0f * scale));
+            // three diagonal ridges toward the bottom-right corner
+            const float d = (px + py) / size; // 0 top-left .. 2 bottom-right
+            for (float k : {1.25f, 1.5f, 1.75f}) {
+                const float dist = std::fabs(d - k) * size / 1.4142f;
+                const float a = Cover(0.9f * scale, dist) * inside(px, py, 3.0f * scale);
+                c.Over(x, y, C(109), C(220), C(230), a);
+            }
+        }
     return c.Finish();
 }
 

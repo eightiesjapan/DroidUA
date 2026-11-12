@@ -31,6 +31,10 @@
 #include "../winp.h"
 #endif
 
+#ifdef __ANDROID__
+bool UAAndroidMapGripRect(int &x, int &y, int &w, int &h);
+#endif
+
 namespace GFX
 {   
 GFXEngine GFXEngine::Instance;
@@ -4307,7 +4311,9 @@ void GFXEngine::DrawAndroidTouchOverlay()
 {
     static std::vector<NC_STACK_winp::AndroidTouchItem> items;
     NC_STACK_winp::AndroidCollectTouchControls(items);
-    if (items.empty()) return;
+    int gx = 0, gy = 0, gw = 0, gh = 0;
+    const bool grip = UAAndroidMapGripRect(gx, gy, gw, gh);
+    if (items.empty() && !grip) return;
 
     const SDL_Rect vp = Android::Viewport();
     const Common::Point win = System::GetResolution();
@@ -4375,9 +4381,30 @@ void GFXEngine::DrawAndroidTouchOverlay()
         DrawVtxQuad(vtx);
     };
 
+    if (grip)
+    {
+        const float size = gw * scale;
+        TouchTex *g = texture("g" + std::to_string(int(std::lround(size))), [&] { return AndroidTouchSprites::Grip(size, scale); });
+        if (g) quad(g, vp.x + gx * sx, vp.y + gy * sy, 0.95f);
+    }
+
     for (const auto &it : items)
     {
         const float cx = vp.x + it.x * sx, cy = vp.y + it.y * sy, r = it.r * scale;
+        if (it.hh > it.r) // MOVE slider
+        {
+            const float hh = it.hh * scale;
+            const std::string key = "s" + std::to_string(int(std::lround(r * 4))) + "x" + std::to_string(int(std::lround(hh * 4))) + (it.held ? "h" : "n");
+            TouchTex *face = texture(key, [&] { return AndroidTouchSprites::Slider(r, hh, scale, it.held); });
+            if (face) quad(face, cx - face->w / 2.0f, cy - face->h / 2.0f, opacity);
+            TouchTex *knob = texture("k" + std::to_string(int(std::lround(scale * 100))), [&] { return AndroidTouchSprites::Knob(scale); });
+            if (knob) quad(knob, cx - knob->w / 2.0f, vp.y + it.knobY * sy - knob->h / 2.0f, opacity);
+            const int maxW = int(it.r * 1.75f * scale);
+            TouchTex *label = texture("l" + it.label + "#" + std::to_string(maxW) + "#" + std::to_string(int(std::lround(scale * 100))),
+                                      [&] { return AndroidTouchSprites::Label(it.label, scale, float(maxW)); });
+            if (label) quad(label, cx - label->w / 2.0f, cy + hh - r * 0.35f - label->h, labelOpacity);
+            continue;
+        }
         const int rKey = int(std::lround(r * 4));
         const std::string base = "c" + std::to_string(rKey) + (it.pad ? "p" : "b") + (it.held ? "h" : "n");
         TouchTex *face = texture(base, [&] { return AndroidTouchSprites::Control(rKey / 4.0f, scale, it.pad, it.held); });

@@ -5,12 +5,13 @@
 #include <istream>
 #include <string>
 namespace AndroidControls {
-enum Action { None,Pause,Brake,Leader,Lead,Click,Mode,Fire,Alt,ZoomIn,ZoomOut,CycleUnit,CycleLeader,Aggro1,Aggro5,OpenMap,OpenMenu,ActionCount };
+enum Action { None,Create,Brake,Leader,Lead,Click,Mode,Fire,Alt,ZoomIn,ZoomOut,CycleUnit,CycleLeader,Aggro1,Aggro5,OpenMap,OpenMenu,ActionCount };
 constexpr int ButtonCount=10;
-struct Config { std::array<int,ButtonCount> actions={{Pause,Brake,Leader,Lead,Click,Fire,Mode,Alt,None,None}}; };
+struct Config { std::array<int,ButtonCount> actions={{Create,Brake,Leader,Lead,Click,Fire,Mode,Alt,None,None}}; };
 inline uint32_t Bit(int action) { return action>None && action<ActionCount ? uint32_t(1)<<action:0; }
 inline int Hotkey(int action) {
-    const int ids[ActionCount]={-1,32,-1,23,45,-1,-1,-1,-1,16,17,22,20,38,42,8,24};
+    // Create: hotkey 2 toggles the vehicle creation list (pause was removed).
+    const int ids[ActionCount]={-1,2,-1,23,45,-1,-1,-1,-1,16,17,22,20,38,42,8,24};
     return action>=None && action<ActionCount?ids[action]:-1;
 }
 inline bool ReadConfig(std::istream& in,Config& out) {

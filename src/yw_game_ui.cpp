@@ -127,6 +127,40 @@ bool UAAndroidUnitMenuIsOpen()
 
 bzd bzda;
 
+#ifdef __ANDROID__
+// Vehicle or building creation is active (create/build mode or its list open).
+bool UAAndroidCreationIsActive()
+{
+    return (bzda.field_1D0 & 0x16) || gui_lstvw.IsOpen();
+}
+static bool AndroidWindowShown(GuiBase &w)
+{
+    return w.IsOpen() && !(w.flags & GuiBase::FLAG_ICONIFED);
+}
+// Map, squad manager or creation in use: automatic VIEW switches must wait.
+bool UAAndroidHudBusy()
+{
+    return AndroidWindowShown(robo_map) || AndroidWindowShown(squadron_manager) || UAAndroidCreationIsActive();
+}
+// Larger touch target for the map's bottom-right resize corner (button 16).
+static const int kAndroidMapGrip = 30;
+bool UAAndroidMapGripRect(int &x, int &y, int &w, int &h)
+{
+    if (!AndroidWindowShown(robo_map) || UAAndroidModalIsOpen()) return false;
+    w = h = kAndroidMapGrip;
+    x = robo_map.x + robo_map.w - w;
+    y = robo_map.y + robo_map.h - h;
+    return true;
+}
+// Called from the click hit-test: a touch inside the grip zone is the resize corner.
+void UAAndroidOverrideButton(ClickBox *box, int boxX, int boxY, int &buttonId)
+{
+    if (box != &robo_map || !AndroidWindowShown(robo_map)) return;
+    if (boxX >= robo_map.w - kAndroidMapGrip && boxY >= robo_map.h - kAndroidMapGrip && robo_map.buttons.size() > 16)
+        buttonId = 16;
+}
+#endif
+
 ////////////////////////////////////////
 ////////////////////////////////////////
 
@@ -11121,6 +11155,19 @@ void NC_STACK_ypaworld::ypaworld_func64__sub1(TInputState *inpt)
     }
 
 #ifdef __ANDROID__
+    // Closing the map or squad manager returns to VIEW mode once nothing else
+    // (map, squad manager, vehicle creation, dialogs) is still open.
+    {
+        static bool prevMap = false, prevSquad = false;
+        const bool mapShown = AndroidWindowShown(robo_map), squadShown = AndroidWindowShown(squadron_manager);
+        if ( ((prevMap && !mapShown) || (prevSquad && !squadShown)) && !UAAndroidHudBusy() &&
+             !UAAndroidModalIsOpen() && _userUnit && _userUnit->_status != BACT_STATUS_DEAD && !_mouseGrabbed )
+        {
+            _mouseGrabbed = true;
+            SDL_Log("OpenUA map/squad closed: VIEW mode");
+        }
+        prevMap = mapShown; prevSquad = squadShown;
+    }
     // Keep the original HUD and open map/squad windows tappable while aiming.
     // Switch before capture strips the button's click flags.
     if(_mouseGrabbed && (winp->selected_btn==&bzda || winp->selected_btn==&robo_map ||

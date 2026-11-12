@@ -60,7 +60,9 @@ public class TouchLayoutActivity extends Activity {
             super(TouchLayoutActivity.this);
             boolean l=true,o=false;
             try(java.util.Scanner s=new java.util.Scanner(new File(getFilesDir(),"game/android-settings.cfg"))) {
-                while(s.hasNext()) { String key=s.next(); if(!s.hasNextInt()) break; int value=s.nextInt(); if(key.equals("large")) l=value==1; if(key.equals("layout")) o=value==1; }
+                int hud=-1;
+                while(s.hasNext()) { String key=s.next(); if(!s.hasNextInt()) break; int value=s.nextInt(); if(key.equals("large")) l=value==1; if(key.equals("hud")) hud=value; if(key.equals("layout")) o=value==1; }
+                if(hud>=0) l=hud>=1; // touch controls follow HUD size (Large and Extra large share a size)
             } catch(IOException ignored) {}
             large=l;original=o; setContentDescription("Drag touch controls to reposition them");
         }
@@ -87,15 +89,20 @@ public class TouchLayoutActivity extends Activity {
                 TouchLayoutConfig.Control c=list[i];
                 // Same look as the in-game overlay: dark rim, steel edge, bevel gradient, cyan glow.
                 paint.setShader(null);paint.setStyle(Paint.Style.FILL);
-                paint.setColor(0xff080e12);canvas.drawCircle(c.x,c.y,c.r,paint);
-                paint.setColor(c.enabled?0xff78999f:0xff4a5b5f);canvas.drawCircle(c.x,c.y,c.r-1,paint);
+                final float e=c.extent(), st=c.straight();
+                paint.setColor(0xff080e12);canvas.drawRoundRect(new RectF(c.x-c.r,c.y-e,c.x+c.r,c.y+e),c.r,c.r,paint);
+                paint.setColor(c.enabled?0xff78999f:0xff4a5b5f);canvas.drawRoundRect(new RectF(c.x-c.r+1,c.y-e+1,c.x+c.r-1,c.y+e-1),c.r-1,c.r-1,paint);
                 boolean held=i==selected;
                 int top=!c.enabled?0xff2a3a3f:(held?0xff6996a2:0xff4e7078), bottom=!c.enabled?0xff182226:(held?0xff2b4a52:0xff1c2a30);
-                paint.setShader(new android.graphics.LinearGradient(0,c.y-c.r,0,c.y+c.r,top,bottom,android.graphics.Shader.TileMode.CLAMP));
-                canvas.drawCircle(c.x,c.y,c.r-2,paint);paint.setShader(null);
-                if(i<2) { paint.setColor(0xff0a161c);canvas.drawCircle(c.x,c.y,c.r*.55f,paint); }
+                paint.setShader(new android.graphics.LinearGradient(0,c.y-e,0,c.y+e,top,bottom,android.graphics.Shader.TileMode.CLAMP));
+                canvas.drawRoundRect(new RectF(c.x-c.r+2,c.y-e+2,c.x+c.r-2,c.y+e-2),c.r-2,c.r-2,paint);paint.setShader(null);
+                if(i==0) { // slider groove with a centre mark
+                    paint.setColor(0xff0a161c);float gw=c.r*.32f;
+                    canvas.drawRoundRect(new RectF(c.x-gw,c.y-st,c.x+gw,c.y+st),gw,gw,paint);
+                    paint.setColor(0xff3c96a5);canvas.drawRect(c.x-c.r*.55f,c.y-.7f,c.x+c.r*.55f,c.y+.7f,paint);
+                } else if(i==1) { paint.setColor(0xff0a161c);canvas.drawCircle(c.x,c.y,c.r*.55f,paint); }
                 paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.4f);paint.setColor(c.enabled?0xff3c96a5:0xff24474d);
-                canvas.drawArc(new RectF(c.x-c.r+2,c.y-c.r+2,c.x+c.r-2,c.y+c.r-2),30,120,false,paint);
+                canvas.drawArc(new RectF(c.x-c.r+2,c.y+st-c.r+2,c.x+c.r-2,c.y+st+c.r-2),30,120,false,paint);
                 paint.setStyle(Paint.Style.FILL);paint.setTypeface(UaStyle.font(getContext()));String label=c.label.toUpperCase(java.util.Locale.ROOT);paint.setTextSize(13);float length=paint.measureText(label);
                 if(length>c.r*1.65f) paint.setTextSize(13*c.r*1.65f/length);
                 paint.setColor(0xff000000);canvas.drawText(label,c.x+1,c.y+1-(paint.ascent()+paint.descent())/2,paint);
@@ -108,7 +115,7 @@ public class TouchLayoutActivity extends Activity {
             RectF vp=viewport();float scale=height()/Math.max(1,vp.height()),x=(e.getX()-vp.left)*scale,y=(e.getY()-vp.top)*scale;
             if(e.getActionMasked()==MotionEvent.ACTION_DOWN) {
                 TouchLayoutConfig.Control[] list=controls();
-                for(int i=0;i<list.length;++i) { float dx=x-list[i].x,dy=y-list[i].y; if(dx*dx+dy*dy<=list[i].r*list[i].r) {
+                for(int i=0;i<list.length;++i) { float dx=x-list[i].x,dy=y-list[i].y; if(list[i].distance(x,y)<=list[i].r) {
                     selected=i;offsetX=dx;offsetY=dy;draft=TouchLayoutConfig.from(list,width(),height());changed=true;invalidate();return true;
                 }}
                 return true;

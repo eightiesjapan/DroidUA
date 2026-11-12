@@ -47,7 +47,7 @@ public:
     static bool AndroidTouchEvent(SDL_Event *event);
     // Touch overlay items in logical screen coordinates; drawn by the renderer
     // at native resolution (crisp, anti-aliased) after the 2D layer.
-    struct AndroidTouchItem { float x, y, r, knobX, knobY; bool pad, held; std::string label; };
+    struct AndroidTouchItem { float x, y, r, hh = 0, knobX, knobY; bool pad, held; std::string label; };
     static void AndroidCollectTouchControls(std::vector<AndroidTouchItem> &items);
     static void AndroidApply(TInputState *input, bool playing, bool &grabbed);
     static Common::Point AndroidPointer() { return _mPos; }

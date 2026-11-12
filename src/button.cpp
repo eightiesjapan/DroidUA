@@ -792,7 +792,7 @@ bool NC_STACK_button::AndroidDrawButton(size_t index, CmdStream *pbuf)
 {
     auto &b=field_d8[index];
     if(Android::InMission() || b.button_type!=TYPE_BUTTON || !(b.flags&FLAG_TEXT) ||
-       !(b.flags&FLAG_BORDER) || ((b.button_id>=6000 && b.button_id<=6004) || b.button_id==6008)) return false;
+       !(b.flags&FLAG_BORDER) || ((b.button_id>=6000 && b.button_id<=6004) || b.button_id==6008 || b.button_id==6010)) return false;
     const bool pressed=(b.flags&FLAG_PRESSED) && !(b.flags&FLAG_NOPRESS);
     const bool disabled=b.flags&FLAG_DISABLED;
     const int tileId=disabled ? b.field_42E : (pressed ? b.tileset_down : b.tileset_up);
