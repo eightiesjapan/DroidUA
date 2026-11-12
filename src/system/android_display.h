@@ -10,8 +10,10 @@ namespace Android {
 // large: menu size (Standard/Large). hud: in-mission HUD size
 // (0 Standard, 1 Large, 2 Extra large); touch controls follow hud but stay
 // the same size for Large and Extra large.
-struct Settings { int layout=0, large=0, fps=60, touch=0, showFPS=0, touchOpacity=75, hud=-1; };
+struct Settings { int layout=0, large=0, fps=60, touch=0, showFPS=0, touchOpacity=75, hud=-1, invertLook=0; };
 int HudSize();
+// Modern look: pushing up looks up (the 1998 default is flight-style inverted).
+bool InvertLook();
 void LoadSettings();
 void ReloadControls();
 const AndroidTouch::Config &TouchConfiguration();

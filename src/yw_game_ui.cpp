@@ -14,6 +14,9 @@
 #include "ypagun.h"
 #include "windp.h"
 #include "world/analyzer.h"
+#ifdef __ANDROID__
+#include "system/android_display.h"
+#endif
 
 
 extern uint32_t bact_id;
@@ -11222,6 +11225,9 @@ void NC_STACK_ypaworld::ypaworld_func64__sub1(TInputState *inpt)
         winp->flag &= ~(TClickBoxInf::FLAG_BTN_DOWN | TClickBoxInf::FLAG_BTN_HOLD | TClickBoxInf::FLAG_BTN_UP);
 
         inpt->Sliders[0] += inpt->Sliders[10];
+#ifdef __ANDROID__
+        if (Android::InvertLook()) inpt->Sliders[11] = -inpt->Sliders[11]; // vertical only
+#endif
         inpt->Sliders[1] += inpt->Sliders[11];
         inpt->Sliders[3] += inpt->Sliders[10];
         inpt->Sliders[5] -= inpt->Sliders[11] * 1.5;

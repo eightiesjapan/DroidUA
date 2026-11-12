@@ -100,6 +100,7 @@ void LoadSettings() {
         if(key=="touchOpacity" && value>=10 && value<=100) settings.touchOpacity=value;
         if(key=="showFPS" && value>=0 && value<=1) settings.showFPS=value;
         if(key=="hud" && value>=0 && value<=2) settings.hud=value;
+        if(key=="invertLook" && value>=0 && value<=1) settings.invertLook=value;
     }
     if(settings.hud<0) settings.hud=settings.large; // older files: HUD followed Interface size
     draft=settings;
@@ -108,6 +109,10 @@ static void RefreshMenu(NC_STACK_button *menu) {
     const char *touch[]={"Automatic","Show","Hide"};
     menu->SetText(6000, draft.layout ? "Original 4:3" : "Automatic");
     menu->SetText(6001, draft.large ? "Large" : "Standard");
+    {
+        NC_STACK_button::button_66arg st; st.butID=6011; st.field_4=draft.invertLook ? 1 : 2;
+        menu->SetState(&st);
+    }
     menu->SetText(6010, draft.hud==2 ? "Extra large" : (draft.hud==1 ? "Large" : "Standard"));
     menu->SetText(6002, draft.fps==30 ? "30 FPS" : "60 FPS");
     menu->SetText(6003, touch[draft.touch]);
@@ -126,6 +131,8 @@ bool CycleSetting(int event, NC_STACK_button *menu) {
     case 6100: draft.layout=!draft.layout; break;
     case 6101: draft.large=!draft.large; break;
     case 6110: draft.hud=(draft.hud+1)%3; break;
+    case 6111: draft.invertLook=1; break;
+    case 6112: draft.invertLook=0; break;
     case 6102: draft.fps=draft.fps==60 ? 30 : 60; break;
     case 6103: draft.touch=(draft.touch+1)%3; break;
     case 6104: draft.showFPS=!draft.showFPS; break;
@@ -144,7 +151,7 @@ bool ApplySettings() {
     std::ofstream out("android-settings.cfg.tmp",std::ios::trunc);
     out << "layout "<<settings.layout<<"\nlarge "<<settings.large<<"\nfps "<<settings.fps
         <<"\ntouch "<<settings.touch<<"\nshowFPS "<<settings.showFPS
-        <<"\ntouchOpacity "<<settings.touchOpacity<<"\nhud "<<settings.hud<<"\n";
+        <<"\ntouchOpacity "<<settings.touchOpacity<<"\nhud "<<settings.hud<<"\ninvertLook "<<settings.invertLook<<"\n";
     out.close();
     if (!out.fail()) std::rename("android-settings.cfg.tmp","android-settings.cfg");
     else SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,"Could not save Android display settings");
@@ -199,6 +206,43 @@ void ConfigureMenu(NC_STACK_button *menu) {
         const int row=(menu->field_d8[i].ypos+step/2)/step;
         if(row>=10 && row<=13) { menu->field_d8[i].ypos-=step; menu->buttons[i].y-=step; }
     }
+    // Row 9: Invert Look | Enemy Indicators | Music.
+    {
+        int cbX=-1, cbW=16, musicX=-1;
+        for(const auto &b:menu->field_d8) {
+            if(b.button_id==1163) { cbX=b.xpos; cbW=b.width; }
+            if(b.button_id==1164) musicX=b.xpos;
+        }
+        // Column starts: Invert Look 0%, Enemy Indicators 30%, Music 68%.
+        const int col1=contentWidth*30/100, col2=contentWidth*68/100;
+        for(size_t i=0;i<menu->field_d8.size();++i) {
+            auto &b=menu->field_d8[i];
+            if((b.ypos+step/2)/step!=9) continue;
+            const bool music=musicX>=0 && b.xpos>=musicX;
+            const int groupStart=music ? musicX : std::max(0,cbX);
+            const int nx=(music ? col2 : col1)+(b.xpos-groupStart);
+            if(b.button_type==NC_STACK_button::TYPE_CAPTION) b.width=std::max(10,std::min<int>(b.width,(music ? contentWidth : col2)-nx-2));
+            menu->buttons[i].x+=nx-b.xpos; b.xpos=nx;
+        }
+        int checkY=9*step;
+        for(const auto &b:menu->field_d8) if(b.button_id==1163) checkY=b.ypos;
+        NC_STACK_button::button_64_arg c={};
+        c.button_type=NC_STACK_button::TYPE_CHECKBX; c.button_id=6011;
+        c.xpos=0; c.ypos=checkY; c.width=cbW;
+        c.caption="g"; c.caption2="g";
+        c.tileset_up=18; c.tileset_down=19; c.field_3A=30;
+        c.downCode=6111; c.upCode=6112;
+        menu->Add(&c);
+        NC_STACK_button::button_64_arg t={};
+        t.button_type=NC_STACK_button::TYPE_CAPTION; t.button_id=6061;
+        t.xpos=cbW+4; t.ypos=checkY; t.width=col1-cbW-6;
+        t.caption="Invert Look"; t.caption2="";
+        t.flags=NC_STACK_button::FLAG_TEXT;
+        t.tileset_up=16; t.tileset_down=16; t.field_3A=16;
+        t.txt_r=80; t.txt_g=190; t.txt_b=190;
+        for(const auto &b:menu->field_d8) if(b.button_type==NC_STACK_button::TYPE_CAPTION && (b.ypos+step/2)/step==9) { t.txt_r=b.txt_r; t.txt_g=b.txt_g; t.txt_b=b.txt_b; t.ypos=b.ypos; break; }
+        menu->Add(&t);
+    }
     add(6050,0,"ANDROID DISPLAY",false);
     const char *labels[]={"Screen layout","Menu size","HUD size","Frame rate","Show FPS","Touch controls","Touch screen"};
     const int ids[]={0,1,10,2,4,3,8};
@@ -220,6 +264,7 @@ int FrameRate() { return settings.fps; }
 void SetControllerPresent(bool present) { controller=present; }
 int TouchOpacity() { return settings.touchOpacity; }
 int HudSize() { return std::max(0,std::min(2,settings.hud)); }
+bool InvertLook() { return settings.invertLook!=0; }
 bool TouchEnabled() { return mission && (settings.touch==1 || (settings.touch==0 && !controller)); }
 bool TouchVisible() { return TouchEnabled() && !UAAndroidUnitMenuIsOpen() && !(mission && UAAndroidModalIsOpen()); }
 SDL_Rect Viewport() {

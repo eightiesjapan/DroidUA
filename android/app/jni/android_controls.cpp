@@ -298,10 +298,12 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
         input->Sliders[4] -= moveY;
     }
     if (grabbed && !modal) {
+        // Up/down only; left/right are never inverted.
+        const float lookV = Android::InvertLook() ? -lookY : lookY;
         input->Sliders[0] += lookX;
-        input->Sliders[1] += lookY;
+        input->Sliders[1] += lookV;
         input->Sliders[3] += lookX;
-        input->Sliders[5] -= lookY * 1.5f;
+        input->Sliders[5] -= lookV * 1.5f;
         // Physical triggers and touch Fire/Alt are independent of A/B hotkeys.
         if(currentActions&Bit(Fire)) input->Buttons.Set(0);
         if(currentActions&Bit(Alt)) input->Buttons.Set(2);
