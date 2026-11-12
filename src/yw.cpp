@@ -6717,7 +6717,14 @@ size_t NC_STACK_ypaworld::ypaworld_func183(yw_arg161 *arg)
 {
     int v6;
 
+#ifdef __ANDROID__
+    // DroidUA: replaying a completed mission starts it fresh. The original
+    // loaded the won end state (<lvl>.fin), which drops the player at the
+    // finished mission and ends it within seconds.
+    if ( false )
+#else
     if ( _globalMapRegions.MapRegions[ arg->lvlID ].Status == TMapRegionInfo::STATUS_COMPLETED && ypaworld_func183__sub0(arg->lvlID, _GameShell->UserName.c_str()) )
+#endif
     {
         std::string savename = fmt::sprintf("save:%s/%d.fin", _GameShell->UserName, arg->lvlID);
         v6 = LoadGame(savename);
