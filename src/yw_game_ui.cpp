@@ -140,6 +140,11 @@ static bool AndroidWindowShown(GuiBase &w)
 {
     return w.IsOpen() && !(w.flags & GuiBase::FLAG_ICONIFED);
 }
+// True while the player controls the host station itself (not a vehicle).
+bool UAAndroidControllingHost()
+{
+    return ypaworld && ypaworld->_userRobo && ypaworld->_userUnit == ypaworld->_userRobo;
+}
 bool UAAndroidMapOrSquadShown()
 {
     return AndroidWindowShown(robo_map) || AndroidWindowShown(squadron_manager);
@@ -10724,6 +10729,41 @@ void NC_STACK_ypaworld::ypaworld_func64__sub21(TInputState *arg)
         if ( _mouseGrabbed )
         {
             mousePointer = -1;
+#ifdef __ANDROID__
+            // VIEW mode: double-tapping a friendly unit in the 3D view enters it
+            // (from the host station or from another vehicle), like the
+            // pointer-mode double-click. Both taps must hit the same unit, which
+            // is re-picked this frame, so a unit that died or vanished between
+            // the taps is never used.
+            static NC_STACK_ypabact *viewTapBact = NULL;
+            static Common::Point viewTapPos;
+            static uint32_t viewTapTime = 0;
+            const bool onUnit = (_guiActFlags & 0x20) && !(_guiActFlags & 4) && _bactOnMouse &&
+                                _bactOnMouse->_owner == _userRobo->_owner &&
+                                _bactOnMouse->_status != BACT_STATUS_DEAD &&
+                                _bactOnMouse->_status != BACT_STATUS_CREATE &&
+                                _bactOnMouse->_status != BACT_STATUS_BEAM &&
+                                _bactOnMouse->_bact_type != BACT_TYPES_MISSLE;
+            if ( arg->ClickInf.flag & TClickBoxInf::FLAG_LM_DOWN )
+            {
+                const uint32_t now = SDL_GetTicks();
+                const Common::Point pos = arg->ClickInf.move.ScreenPos;
+                if ( onUnit && viewTapBact == _bactOnMouse && now - viewTapTime <= 450 &&
+                     Common::ABS(pos.x - viewTapPos.x) <= 24 && Common::ABS(pos.y - viewTapPos.y) <= 24 &&
+                     _bactOnMouse != _userUnit )
+                {
+                    viewTapBact = NULL;
+                    SDL_Log("OpenUA VIEW double tap: entering unit");
+                    ypaworld_func64__sub21__sub5(World::DOACTION_5);
+                }
+                else
+                {
+                    viewTapBact = onUnit ? _bactOnMouse : NULL;
+                    viewTapPos = pos;
+                    viewTapTime = now;
+                }
+            }
+#endif
         }
         else if ( _guiDragDefaultMouse || ((_guiActFlags & 4) && !(_guiActFlags & 0x48)) )
         {

@@ -10,6 +10,7 @@ bool UAAndroidMapIsOpen();
 bool UAAndroidModalIsOpen();
 bool UAAndroidCreationIsActive();
 bool UAAndroidMapOrSquadShown();
+bool UAAndroidControllingHost();
 bool UAAndroidHudBusy();
 void UAAndroidPanMap(float x,float y);
 #include "system/gfx.h"
@@ -280,12 +281,15 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
     // being processed, so the tap that closed the window (e.g. the bottom-bar
     // map icon, which counts as a HUD click) cannot undo it.
     {
-        static bool wasShown=false, wasCreating=false, pendingView=false;
+        static bool wasShown=false, wasCreating=false, wasInVehicle=false, pendingView=false;
         static int quietFrames=0;
         const bool shown=playing && UAAndroidMapOrSquadShown();
         const bool creating=playing && UAAndroidCreationIsActive();
-        // Map / squad manager closed, or vehicle creation switched off.
-        if(playing && ((wasShown && !shown) || (wasCreating && !creating))) { pendingView=true; quietFrames=0; }
+        const bool inVehicle=playing && !UAAndroidControllingHost();
+        // Map / squad manager closed, vehicle creation switched off, or control
+        // returned from a vehicle to the host station (the game itself drops to
+        // pointer mode on return, so this must happen after it).
+        if(playing && ((wasShown && !shown) || (wasCreating && !creating) || (wasInVehicle && !inVehicle))) { pendingView=true; quietFrames=0; }
         if(!playing || shown || modal || grabbed || UAAndroidHudBusy()) pendingView=false;
         const bool clicking=manualTouchHeld || leftClick ||
             (input->ClickInf.flag & (TClickBoxInf::FLAG_LM_DOWN|TClickBoxInf::FLAG_LM_HOLD|TClickBoxInf::FLAG_LM_UP|
@@ -294,10 +298,10 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
             quietFrames=clicking ? 0 : quietFrames+1;
             if(quietFrames>=2) {
                 grabbed=true; pendingView=false;
-                SDL_Log("OpenUA map/squad/creation closed: VIEW mode");
+                SDL_Log("OpenUA map/squad/creation closed or host return: VIEW mode");
             }
         }
-        wasShown=shown; wasCreating=creating;
+        wasShown=shown; wasCreating=creating; wasInVehicle=inVehicle;
     }
     touchPointer=!grabbed;
     if (playing && !modal && (mapPanX || mapPanY))
