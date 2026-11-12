@@ -280,10 +280,12 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
     // being processed, so the tap that closed the window (e.g. the bottom-bar
     // map icon, which counts as a HUD click) cannot undo it.
     {
-        static bool wasShown=false, pendingView=false;
+        static bool wasShown=false, wasCreating=false, pendingView=false;
         static int quietFrames=0;
         const bool shown=playing && UAAndroidMapOrSquadShown();
-        if(playing && wasShown && !shown) { pendingView=true; quietFrames=0; }
+        const bool creating=playing && UAAndroidCreationIsActive();
+        // Map / squad manager closed, or vehicle creation switched off.
+        if(playing && ((wasShown && !shown) || (wasCreating && !creating))) { pendingView=true; quietFrames=0; }
         if(!playing || shown || modal || grabbed || UAAndroidHudBusy()) pendingView=false;
         const bool clicking=manualTouchHeld || leftClick ||
             (input->ClickInf.flag & (TClickBoxInf::FLAG_LM_DOWN|TClickBoxInf::FLAG_LM_HOLD|TClickBoxInf::FLAG_LM_UP|
@@ -292,10 +294,10 @@ void NC_STACK_winp::AndroidApply(TInputState *input, bool playing, bool &grabbed
             quietFrames=clicking ? 0 : quietFrames+1;
             if(quietFrames>=2) {
                 grabbed=true; pendingView=false;
-                SDL_Log("OpenUA map/squad closed: VIEW mode");
+                SDL_Log("OpenUA map/squad/creation closed: VIEW mode");
             }
         }
-        wasShown=shown;
+        wasShown=shown; wasCreating=creating;
     }
     touchPointer=!grabbed;
     if (playing && !modal && (mapPanX || mapPanY))
