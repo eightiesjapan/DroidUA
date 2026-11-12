@@ -1,7 +1,7 @@
 #ifndef WORLD_NPARTICLE_H_INCLUDED
 #define WORLD_NPARTICLE_H_INCLUDED
 
-#include <deque>
+#include <vector>
 #include "../system/tform.h"
 #include "../system/gfx.h"
 #include "../vectors.h"
@@ -47,7 +47,9 @@ protected:
     
     
 protected:
-    std::deque<Frak> _particles;
+    // Contiguous storage; dead particles are compacted in one pass per frame
+    // (erasing from the middle of a deque was O(n^2) in big battles).
+    std::vector<Frak> _particles;
     
     bool _disableAdd = false;
 };

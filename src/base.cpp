@@ -515,8 +515,8 @@ size_t NC_STACK_base::Render(baseRender_msg *arg, Instance * inst, bool doCopy /
         
         float distance = skel132.tform.getTranslate().length();
         
-        bool newsky = System::IniConf::GfxNewSky.Get<bool>();
-        float transDist = System::IniConf::GfxSkyDistance.Get<int>();
+        bool newsky = GFX::Engine._frameNewSky;
+        float transDist = GFX::Engine._frameSkyDistance;
         
         for(GFX::TMesh &msh : Meshes)
         {       
@@ -629,8 +629,8 @@ size_t NC_STACK_base::RenderImmediately(baseRender_msg *arg, Instance * inst)
         
         float distance = skel132.tform.Transform( _transform.Pos ).length();
         
-        bool newsky = System::IniConf::GfxNewSky.Get<bool>();
-        float transDist = System::IniConf::GfxSkyDistance.Get<int>();
+        bool newsky = GFX::Engine._frameNewSky;
+        float transDist = GFX::Engine._frameSkyDistance;
         
         for(GFX::TMesh &msh : Meshes)
         {
@@ -1036,8 +1036,8 @@ void TObjectCache::Render(baseRender_msg *arg)
 
     float distance = tf.Transform( Transform.Pos ).length();
 
-    bool newsky = System::IniConf::GfxNewSky.Get<bool>();
-    float transDist = System::IniConf::GfxSkyDistance.Get<int>();
+    bool newsky = GFX::Engine._frameNewSky;
+    float transDist = GFX::Engine._frameSkyDistance;
         
     for(GFX::TMesh &msh : Meshes)
     {

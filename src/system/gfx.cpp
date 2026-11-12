@@ -6,6 +6,9 @@
 #else
 #include <GL/glext.h>
 #include <queue>
+#include <algorithm>
+#include <functional>
+#include <cmath>
 #endif
 
 #include "gfx.h"
@@ -62,13 +65,15 @@ std::vector<TGFXDeviceInfo> GFXEngine::_devices
 
 bool TRenderNode::CompareSolid(TRenderNode *a, TRenderNode *b)
 {
-    if ( !a->Mesh )
-        return true;
+    // Strict weak ordering (required by std::stable_sort): group by texture,
+    // then by render flags so identical states are drawn back to back.
+    if ( !a->Mesh || !b->Mesh )
+        return a->Mesh == NULL && b->Mesh != NULL;
     
-    if ( !b->Mesh )
-        return false;
+    if (a->Tex != b->Tex)
+        return a->Tex < b->Tex;
     
-    return a->Tex < b->Tex;
+    return a->Flags < b->Flags;
 }
 
 bool TRenderNode::CompareTransparent(TRenderNode* a, TRenderNode* b)
@@ -101,6 +106,11 @@ void GFXEngine::StaticInit()
     
     SDL_DisplayMode curr;
     SDL_GetCurrentDisplayMode(0, &curr);
+#ifdef __ANDROID__
+    // GLES has no BGRA upload; keep the 2D layer in RGBA byte order so the
+    // per-frame screen texture upload needs no CPU swizzle inside gl4es.
+    curr.format = SDL_PIXELFORMAT_ABGR8888;
+#endif
     
     switch(curr.format)
     {
@@ -1004,20 +1014,11 @@ void GFXEngine::SetRenderStates(int setAll)
         _lastStates = _states;
 }
 
-void GFXEngine::RenderingMeshOld(TRenderNode *nod)
+void GFXEngine::SetupNodeStatesOld(TRenderNode *nod, bool &useComputedColor)
 {
-    if ( !_sceneBeginned )
-        return;
-    
-    if (!nod)
-        return;
-    
     TMesh *mesh = nod->Mesh;
-    
-    if (!mesh)
-        return;
-    
     uint32_t flags = nod->Flags;
+    useComputedColor = false;
 
     _states.Shaded = false;
     _states.Stipple = false;
@@ -1032,8 +1033,7 @@ void GFXEngine::RenderingMeshOld(TRenderNode *nod)
     _states.AlphaTest = false;
     _states.AFog = false;
     _states.Prog = TShaderProg();
-    
-    bool useComputedColor = false;
+
 
     if ( flags & RFLAGS_TEXTURED )
     {
@@ -1107,28 +1107,47 @@ void GFXEngine::RenderingMeshOld(TRenderNode *nod)
     }
     else if (flags & RFLAGS_FALLOFF)
     {
-        float transDist = System::IniConf::GfxSkyDistance.Get<int>();
-        float transLen = System::IniConf::GfxSkyLength.Get<int>();
+        const float transDist = _frameSkyDistance;
+        const float transLen = _frameSkyLength;
+        const mat4x4 &tf = nod->TForm;
 
-        for(TVertex &v : mesh->Vertexes)
+        // Conservative early-out: if every corner of the bounding box is inside
+        // the fade distance, no vertex changes and the plain colours are used.
+        bool mayFade = true;
+        if (mesh->BoundBox.Inited)
         {
-            v.ComputedColor = v.Color;
-
-            float distance = nod->TForm.Transform( v.Pos ).XZ().length();
-
-            if (distance > transDist)
+            const vec3d &mn = mesh->BoundBox.Min, &mx = mesh->BoundBox.Max;
+            float far2 = 0.0;
+            for (int c = 0; c < 8; ++c)
             {
-                float prc = (distance - transDist) / transLen;
-                if (prc > 1.0)
-                    prc = 1.0;
-                if (prc < 0.0)
-                    prc = 0.0;
+                vec3d corner((c & 1) ? mx.x : mn.x, (c & 2) ? mx.y : mn.y, (c & 4) ? mx.z : mn.z);
+                vec3d t = tf.Transform(corner);
+                far2 = std::max(far2, float(t.x * t.x + t.z * t.z));
+            }
+            mayFade = far2 > transDist * transDist;
+        }
 
-                prc = (1.0 - prc);
-
-                v.ComputedColor.a *= prc;
-
-                useComputedColor = true;
+        if (mayFade)
+        {
+            // Only X and Z are needed; compare squared distances so sqrt is
+            // taken only for vertices that actually fade.
+            const float a0 = tf.m00, a1 = tf.m01, a2 = tf.m02, a3 = tf.m03;
+            const float c0 = tf.m20, c1 = tf.m21, c2 = tf.m22, c3 = tf.m23;
+            const float td2 = transDist * transDist;
+            const float invLen = transLen > 0.0f ? 1.0f / transLen : 0.0f;
+            for(TVertex &v : mesh->Vertexes)
+            {
+                v.ComputedColor = v.Color;
+                const float x = a0 * v.Pos.x + a1 * v.Pos.y + a2 * v.Pos.z + a3;
+                const float z = c0 * v.Pos.x + c1 * v.Pos.y + c2 * v.Pos.z + c3;
+                const float d2 = x * x + z * z;
+                if (d2 > td2)
+                {
+                    float prc = (std::sqrt(d2) - transDist) * invLen;
+                    if (prc > 1.0f) prc = 1.0f;
+                    v.ComputedColor.a *= (1.0f - prc);
+                    useComputedColor = true;
+                }
             }
         }
 
@@ -1154,6 +1173,25 @@ void GFXEngine::RenderingMeshOld(TRenderNode *nod)
     
     if (flags & RFLAGS_DISABLE_ZWRITE)
         _states.Zwrite = false;
+
+}
+
+void GFXEngine::RenderingMeshOld(TRenderNode *nod)
+{
+    if ( !_sceneBeginned )
+        return;
+    
+    if (!nod)
+        return;
+    
+    TMesh *mesh = nod->Mesh;
+    
+    if (!mesh)
+        return;
+    
+    uint32_t flags = nod->Flags;
+    bool useComputedColor = false;
+    SetupNodeStatesOld(nod, useComputedColor);
 
     SetRenderStates(0);
 
@@ -1374,50 +1412,145 @@ void GFXEngine::QueueRenderMesh(TRenderNode *nod)
         _renderSolidList.push_back(nod);
 }
 
+static bool ParticleBatchable(const TRenderNode *a, const TRenderNode *b)
+{
+    return a->Type == TRenderNode::TYPE_PARTICLE && b->Type == TRenderNode::TYPE_PARTICLE &&
+           a->Mesh && b->Mesh && a->Tex == b->Tex && a->Flags == b->Flags &&
+           a->FogStart == b->FogStart && a->FogLength == b->FogLength &&
+           a->Mesh->Indixes.size() == 6 && b->Mesh->Indixes.size() == 6 &&
+           a->Mesh->Vertexes.size() == 4 && b->Mesh->Vertexes.size() == 4;
+}
+
+void GFXEngine::RenderParticleBatchOld(TRenderNode **nodes, size_t count)
+{
+    // Many particles with identical render state become one draw call. Vertices
+    // are pre-transformed into view space (each particle's TForm is only a scale
+    // and a translation), so the result is identical to drawing them one by one
+    // in the same order, without per-particle matrix/array/draw overhead.
+    static std::vector<float> pos, col, uv;
+    static std::vector<uint16_t> idx;
+    const size_t maxPerBatch = 65536 / 4;
+
+    while (count)
+    {
+        const size_t n = std::min(count, maxPerBatch);
+        pos.resize(n * 12); col.resize(n * 16); uv.resize(n * 8); idx.resize(n * 6);
+
+        for (size_t i = 0; i < n; ++i)
+        {
+            TRenderNode *nod = nodes[i];
+            TMesh *mesh = nod->Mesh;
+            const mat4x4 &tf = nod->TForm;
+            const tUtV *coords = NULL;
+            if ( (nod->Flags & RFLAGS_TEXTURED) && (nod->Flags & RFLAGS_DYNAMIC_TEXTURE) && nod->coordsID >= 0 )
+                coords = mesh->CoordsCache.at( nod->coordsID ).Coords.data();
+
+            for (int v = 0; v < 4; ++v)
+            {
+                const TVertex &vx = mesh->Vertexes[v];
+                vec3d p = tf.Transform( vec3d(vx.Pos.x, vx.Pos.y, vx.Pos.z) );
+                float *pp = &pos[(i * 4 + v) * 3];
+                pp[0] = p.x; pp[1] = p.y; pp[2] = p.z;
+                float *cc = &col[(i * 4 + v) * 4];
+                const TGLColor &vc = (nod->Flags & RFLAGS_COMPUTED_COLOR) ? vx.ComputedColor : vx.Color;
+                cc[0] = vc.r; cc[1] = vc.g; cc[2] = vc.b; cc[3] = vc.a;
+                const tUtV &t = coords ? coords[v] : vx.TexCoord;
+                uv[(i * 4 + v) * 2 + 0] = t.tu;
+                uv[(i * 4 + v) * 2 + 1] = t.tv;
+            }
+            for (int k = 0; k < 6; ++k)
+                idx[i * 6 + k] = uint16_t(i * 4 + mesh->Indixes[k]);
+        }
+
+        bool useComputedColor = false;
+        SetupNodeStatesOld(nodes[0], useComputedColor);
+        SetRenderStates(0);
+        SetModelViewMatrix( mat4x4() );
+
+        glVertexPointer(3, GL_FLOAT, 0, pos.data());
+        glColorPointer(4, GL_FLOAT, 0, col.data());
+        if (nodes[0]->Flags & RFLAGS_TEXTURED)
+            glTexCoordPointer(2, GL_FLOAT, 0, uv.data());
+        glDrawElements(GL_TRIANGLES, GLsizei(n * 6), GL_UNSIGNED_SHORT, idx.data());
+
+        nodes += n;
+        count -= n;
+    }
+}
+
+void GFXEngine::RenderQueue(std::vector<TRenderNode *> &queue, bool batchParticles)
+{
+    const size_t total = queue.size();
+    for (size_t i = 0; i < total; )
+    {
+        TRenderNode *node = queue[i];
+        size_t j = i + 1;
+        if (batchParticles && !_vbo && node && node->Type == TRenderNode::TYPE_PARTICLE)
+            while (j < total && queue[j] && ParticleBatchable(node, queue[j]))
+                ++j;
+
+        if (j - i > 1)
+        {
+            if (_sceneBeginned)
+                RenderParticleBatchOld(&queue[i], j - i);
+        }
+        else
+            RenderNode(node);
+        i = j;
+    }
+    queue.clear();
+}
+
+static bool IsCommutativeParticle(const TRenderNode *n, bool zbufWhenTracy, bool destBlend)
+{
+    // Additive (ONE, ONE) particles without depth writes produce the same image
+    // in any order, so a run of them may be regrouped by state for batching.
+    return n->Type == TRenderNode::TYPE_PARTICLE && destBlend && !zbufWhenTracy &&
+           (n->Flags & RFLAGS_LUMTRACY) &&
+           !(n->Flags & (RFLAGS_FALLOFF | RFLAGS_SKY | RFLAGS_ZEROTRACY));
+}
+
 void GFXEngine::Rasterize(uint32_t RasterEtapes)
 {
     if (RasterEtapes & RASTER_SKY)
     {
-        _renderSkyBoxList.sort(TRenderNode::CompareSolid);
-        
-        while(!_renderSkyBoxList.empty())
-        {
-            RenderNode( _renderSkyBoxList.front() );
-            _renderSkyBoxList.pop_front();
-        }
+        std::stable_sort(_renderSkyBoxList.begin(), _renderSkyBoxList.end(), TRenderNode::CompareSolid);
+        RenderQueue(_renderSkyBoxList, false);
     }
     
     if (RasterEtapes & RASTER_SOLID)
     {
-        _renderSolidList.sort(TRenderNode::CompareSolid);
-        
-        while(!_renderSolidList.empty())
-        {
-            RenderNode( _renderSolidList.front() );
-            _renderSolidList.pop_front();
-        }
+        std::stable_sort(_renderSolidList.begin(), _renderSolidList.end(), TRenderNode::CompareSolid);
+        RenderQueue(_renderSolidList, true);
     }
     
     if (RasterEtapes & RASTER_ZEROTR)
     {
-        _renderZeroTracyList.sort(TRenderNode::CompareSolid);
-        
-        while(!_renderZeroTracyList.empty())
-        {
-            RenderNode( _renderZeroTracyList.front() );
-            _renderZeroTracyList.pop_front();
-        }
+        std::stable_sort(_renderZeroTracyList.begin(), _renderZeroTracyList.end(), TRenderNode::CompareSolid);
+        RenderQueue(_renderZeroTracyList, true);
     }
     
     if (RasterEtapes & RASTER_LUMATR)
     {
-        _renderLumaTracyList.sort(TRenderNode::CompareTransparent);
+        std::stable_sort(_renderLumaTracyList.begin(), _renderLumaTracyList.end(), TRenderNode::CompareTransparent);
         
-        while(!_renderLumaTracyList.empty())
+        if (!_vbo)
         {
-            RenderNode( _renderLumaTracyList.front() );
-            _renderLumaTracyList.pop_front();
+            // Inside each back-to-front run of order-independent additive
+            // particles, group equal states together so they batch.
+            auto &q = _renderLumaTracyList;
+            const bool zb = _zbuf_when_tracy != 0, db = can_destblend != 0;
+            for (size_t i = 0; i < q.size(); )
+            {
+                if (!q[i] || !IsCommutativeParticle(q[i], zb, db)) { ++i; continue; }
+                size_t j = i + 1;
+                while (j < q.size() && q[j] && IsCommutativeParticle(q[j], zb, db)) ++j;
+                if (j - i > 2)
+                    std::stable_sort(q.begin() + i, q.begin() + j, TRenderNode::CompareSolid);
+                i = j;
+            }
         }
+        RenderQueue(_renderLumaTracyList, true);
     }
 }
 
@@ -1803,6 +1936,9 @@ void GFXEngine::raster_func221(const Common::Rect &arg)
 
 void GFXEngine::BeginFrame()
 {
+    _frameNewSky = System::IniConf::GfxNewSky.Get<bool>();
+    _frameSkyDistance = System::IniConf::GfxSkyDistance.Get<int>();
+    _frameSkyLength = System::IniConf::GfxSkyLength.Get<int>();
     SDL_FillRect(Screen(), NULL, SDL_MapRGBA(Screen()->format, 0, 0, 0, 0) );
     
     Common::Point scrSz = System::GetResolution();

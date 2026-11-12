@@ -10,6 +10,7 @@ namespace World
 
 ParticleSystem::ParticleSystem()
 {
+    _particles.reserve(1024);
 }
     
 void ParticleSystem::AddParticle(NC_STACK_particle *base, const vec3d& pos, const vec3d& vec, int32_t age)
@@ -25,22 +26,18 @@ void ParticleSystem::UpdateRender(area_arg_65 *rndrParams, int32_t delta)
     
     float fsec = (float)delta * 0.001;
     
-    for(auto it = _particles.begin(); it != _particles.end();)
+    size_t out = 0;
+    const size_t total = _particles.size();
+    for(size_t i = 0; i < total; ++i)
     {
-        Frak &f = *it;
+        Frak &f = _particles[i];
         if (!f.pParticleGen)
-        {
-            it = _particles.erase(it);
             continue;
-        }
         
         f.Age += delta;
         
         if (f.Age >= f.pParticleGen->_lifeTime)
-        {
-            it = _particles.erase(it);
             continue;
-        }
         
         f.Vec += f.pParticleGen->_accelStart + f.pParticleGen->_accelDelta * f.Age;
         f.Pos += f.Vec * fsec + NC_STACK_particle::RandVec() * f.pParticleGen->_noisePower;
@@ -48,8 +45,11 @@ void ParticleSystem::UpdateRender(area_arg_65 *rndrParams, int32_t delta)
         
         Render(&f, scl, rndrParams);
         
-        it++;
+        if (out != i)
+            _particles[out] = f;
+        ++out;
     }
+    _particles.erase(_particles.begin() + out, _particles.end());
     
     _disableAdd = false;
 }

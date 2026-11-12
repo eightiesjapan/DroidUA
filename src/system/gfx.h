@@ -687,6 +687,9 @@ public:
     Common::Point ConvertPosTo2DStuff(const Common::Point &pos);
     
     void RenderingMeshOld(TRenderNode *mesh);
+    void SetupNodeStatesOld(TRenderNode *nod, bool &useComputedColor);
+    void RenderParticleBatchOld(TRenderNode **nodes, size_t count);
+    void RenderQueue(std::vector<TRenderNode *> &queue, bool batchParticles);
     void RenderingMesh(TRenderNode *mesh);
     void RenderNode(TRenderNode *node);
     void Rasterize(uint32_t RasterEtapes = RASTER_ALL);
@@ -777,16 +780,21 @@ public:
 
     
     
-    std::list<TRenderNode *> _renderSolidList;
-    std::list<TRenderNode *> _renderSkyBoxList;
-    std::list<TRenderNode *> _renderZeroTracyList;
-    std::list<TRenderNode *> _renderLumaTracyList;
+    std::vector<TRenderNode *> _renderSolidList;
+    std::vector<TRenderNode *> _renderSkyBoxList;
+    std::vector<TRenderNode *> _renderZeroTracyList;
+    std::vector<TRenderNode *> _renderLumaTracyList;
     
     Common::CacheStorage<TRenderNode> _renderNodesCache;
 
     int _sceneBeginned;
 
     ScreenFont _font;
+
+    // Per-frame cache of ini values read in per-mesh hot paths.
+    bool  _frameNewSky = true;
+    float _frameSkyDistance = 3000.0;
+    float _frameSkyLength = 500.0;
 
     float _corrW, _corrIW;
     float _corrH, _corrIH;
