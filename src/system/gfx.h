@@ -522,6 +522,14 @@ public:
     
     void RecreateScreenSurface();
     void DrawScreenSurface();
+#ifdef __ANDROID__
+    // Widescreen "Console rails" fill behind 4:3 shell screens.
+    // style 0: Console rails (menus, maps); 1: Side monitors (briefing/debriefing)
+    void NoteAndroidBackground(SDL_Surface *bg, int style = 0);
+    void DrawAndroidWideFill();
+    // Touch controls at native resolution (anti-aliased sprites) over the 2D layer.
+    void DrawAndroidTouchOverlay();
+#endif
     
     uint32_t LoadShader(int32_t type, const std::string &fl);
     uint32_t CompileShader(int32_t type, const std::string &string);

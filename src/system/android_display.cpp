@@ -57,6 +57,15 @@ void EditGamepadSettings() {
     if(env->ExceptionCheck()) env->ExceptionClear();
     env->DeleteLocalRef(cls);env->DeleteLocalRef(activity);
 }
+// Closes the engine and reopens the DroidUA launcher (backups, restore, import).
+static void OpenLauncher() {
+    JNIEnv *env=static_cast<JNIEnv *>(SDL_AndroidGetJNIEnv());
+    jobject activity=static_cast<jobject>(SDL_AndroidGetActivity());if(!activity) return;
+    jclass cls=env->GetObjectClass(activity);jmethodID method=env->GetMethodID(cls,"openLauncher","()V");
+    if(method) env->CallVoidMethod(activity,method);
+    if(env->ExceptionCheck()) env->ExceptionClear();
+    env->DeleteLocalRef(cls);env->DeleteLocalRef(activity);
+}
 static bool mission=false, controller=false;
 static int safe[4]={0,0,0,0};
 static float measuredFPS=0;
@@ -116,6 +125,7 @@ bool CycleSetting(int event, NC_STACK_button *menu) {
     case 6103: draft.touch=(draft.touch+1)%3; break;
     case 6104: draft.showFPS=!draft.showFPS; break;
     case 6108: EditTouchLayout(); break;
+    case 6109: OpenLauncher(); return true;
     case 6105: case 6106: case 6107:
         if(auto slider=menu->GetSliderData(6005)) draft.touchOpacity=slider->value;
         break;
@@ -214,7 +224,7 @@ bool InsideViewport(int x,int y) { auto r=Viewport(); return x>=r.x && y>=r.y &&
 void SetViewport() { auto r=Viewport(); auto size=System::GetResolution(); glViewport(r.x,size.y-r.y-r.h,r.w,r.h); }
 void ReportFPS(float fps) { measuredFPS=fps; }
 void DrawOverlay(SDL_Surface *screen) {
-    NC_STACK_winp::AndroidDrawTouchControls(screen);
+    // Touch controls are drawn by GFX::DrawAndroidTouchOverlay at native resolution.
     if(!settings.showFPS) return;
     static std::unique_ptr<TTF_Font,decltype(&TTF_CloseFont)> font(System::LoadFont("Liberation Sans",14),TTF_CloseFont);
     static std::shared_ptr<SDL_Surface> label;

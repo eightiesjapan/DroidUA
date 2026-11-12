@@ -13,7 +13,7 @@ public class GamepadSettingsActivity extends Activity {
     private int dp(int n) {return Math.round(n*getResources().getDisplayMetrics().density);}
     private Button button(String text,Runnable action) {
         Button b=new Button(this);b.setText(text);b.setAllCaps(false);b.setTextColor(0xffdff5f7);b.setTextSize(17);b.setMinHeight(dp(54));
-        b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff19313b));b.setOnClickListener(v->action.run());return b;
+        UaStyle.button(b);b.setOnClickListener(v->action.run());return b;
     }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);file=new File(getFilesDir(),"game/android-gamepad.cfg");draft=GamepadConfig.load(file);

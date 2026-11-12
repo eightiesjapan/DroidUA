@@ -22,6 +22,10 @@
 #include "../font.h"
 #include "inivals.h"
 #include "android_display.h"
+#ifdef __ANDROID__
+#include "android_widefill.h"
+#include "android_touchsprites.h"
+#endif
 #include "glfuncs.h"
 #ifdef __ANDROID__
 #include "../winp.h"
@@ -682,6 +686,12 @@ size_t GFXEngine::raster_func202(rstr_arg204 *arg)
     SDL_Rect src = r1;
     SDL_Rect dst = r2;
     
+#ifdef __ANDROID__
+    // A whole bitmap stretched over the whole logical screen is a shell background.
+    if (src.x <= 0 && src.y <= 0 && src.w >= arg->pbitm->width - 1 && src.h >= arg->pbitm->height - 1 &&
+        dst.x <= 0 && dst.y <= 0 && dst.x + dst.w >= _resolution.x - 1 && dst.y + dst.h >= _resolution.y - 1)
+        NoteAndroidBackground(arg->pbitm->swTex);
+#endif
     SDL_BlitScaled(arg->pbitm->swTex, &src, Screen(), &dst);
     
     return 1;
@@ -701,6 +711,12 @@ size_t GFXEngine::raster_func204(rstr_arg204 *arg)
     r2.right  = _field_554 * (arg->float14.right  + 1.0);
     r2.bottom = _field_558 * (arg->float14.bottom + 1.0);
     
+#ifdef __ANDROID__
+    // Briefing/debriefing backgrounds are drawn through this clipped blit.
+    if ( r1.left <= 0 && r1.top <= 0 && r1.right >= arg->pbitm->width - 1 && r1.bottom >= arg->pbitm->height - 1 &&
+         r2.left <= 0 && r2.top <= 0 && r2.right >= _resolution.x - 1 && r2.bottom >= _resolution.y - 1 )
+        NoteAndroidBackground(arg->pbitm->swTex, 1);
+#endif
     if ( _clip.IsIntersects(r2) )
     {
         if ( r2.left < _clip.left )
@@ -2002,8 +2018,12 @@ void GFXEngine::EndFrame()
     }
     Android::DrawOverlay(Screen());
     SDL_ShowCursor(SDL_DISABLE);
+    DrawAndroidWideFill();
 #endif
     DrawScreenSurface();
+#ifdef __ANDROID__
+    DrawAndroidTouchOverlay();
+#endif
     Gui::Root::Instance.HwCompose();
     
     if (_colorEffects == 1)
@@ -2321,8 +2341,12 @@ void GFXEngine::draw2DandFlush()
     }
     Android::DrawOverlay(Screen());
     SDL_ShowCursor(SDL_DISABLE);
+    DrawAndroidWideFill();
 #endif
     DrawScreenSurface();
+#ifdef __ANDROID__
+    DrawAndroidTouchOverlay();
+#endif
     Gui::Root::Instance.HwCompose();
 
     SDL_FillRect(Screen(), NULL, SDL_MapRGBA(Screen()->format, 0, 0, 0, 0) );
@@ -4132,6 +4156,259 @@ void GFXEngine::DrawScreenSurface()
     
     _states = save;
 }
+
+#ifdef __ANDROID__
+namespace {
+// The fill never keeps a pointer to the background surface beyond the blit that
+// noted it: shell bitmaps (and loading screens) are freed when switching between
+// missions and menus. Everything needed is captured while the surface is alive.
+struct WideFillKey {
+    uint32_t sum = 0;
+    int w = 0, h = 0, W = 0, left = 0, style = 0;
+    bool operator==(const WideFillKey &o) const { return sum == o.sum && w == o.w && h == o.h && W == o.W && left == o.left && style == o.style; }
+};
+struct WideFillCache {
+    WideFillKey key;
+    GLuint tex = 0;
+    uint32_t used = 0;
+};
+std::array<WideFillCache, 6> wideCache;
+bool wideNoted = false, wideLastNoted = false;
+WideFillKey wideKey, wideLastKey;           // values only, never surface pointers
+std::vector<uint8_t> widePending;           // built image waiting for upload
+WideFillKey widePendingKey;
+uint32_t wideFrame = 0;
+
+uint32_t SurfaceSum(SDL_Surface *s)
+{
+    // Cheap identity of the picture content.
+    if (!s || !s->pixels || !s->format || s->w <= 0 || s->h <= 0) return 0;
+    uint32_t h = 2166136261u ^ uint32_t(s->w * 31 + s->h);
+    SDL_LockSurface(s);
+    const uint8_t *p = static_cast<const uint8_t *>(s->pixels);
+    const int bpp = s->format->BytesPerPixel;
+    for (int i = 0; i < 64; ++i) {
+        int y = (i * 37) % s->h, x = (i * 101) % s->w;
+        const uint8_t *px = p + size_t(y) * s->pitch + x * bpp;
+        for (int b = 0; b < bpp; ++b) h = (h ^ px[b]) * 16777619u;
+    }
+    SDL_UnlockSurface(s);
+    return h;
+}
+
+bool WideGeometry(int &W, int &left)
+{
+    const SDL_Rect vp = Android::Viewport();
+    const Common::Point win = System::GetResolution();
+    if (vp.w <= 0 || vp.h <= 0 || (vp.x <= 1 && vp.x + vp.w >= win.x - 1)) return false; // no side bars
+    left = int(std::lround(vp.x * 640.0 / vp.w));
+    W = int(std::lround(win.x * 640.0 / vp.w));
+    return W > 640 + 2;
+}
+}
+
+void GFXEngine::NoteAndroidBackground(SDL_Surface *bg, int style)
+{
+    if (wideNoted || !bg || Android::InMission()) return; // first full-screen layer = base picture
+    WideFillKey key;
+    if (!WideGeometry(key.W, key.left)) return;
+    key.sum = SurfaceSum(bg);
+    key.w = bg->w; key.h = bg->h; key.style = style;
+    wideNoted = true;
+    wideKey = key;
+    for (auto &c : wideCache) if (c.tex && c.key == key) return;
+    if (!widePending.empty() && widePendingKey == key) return;
+    // Build now, while the surface is guaranteed to be alive.
+    widePending = style == 1 ? AndroidWideFill::BuildSideMonitors(bg, key.W, key.left)
+                             : AndroidWideFill::BuildConsoleRails(bg, key.W, key.left);
+    widePendingKey = key;
+}
+
+void GFXEngine::DrawAndroidWideFill()
+{
+    ++wideFrame;
+    // Tolerate one frame without a background redraw (values, not pointers).
+    const bool have = wideNoted || wideLastNoted;
+    const WideFillKey key = wideNoted ? wideKey : wideLastKey;
+    wideLastNoted = wideNoted; wideLastKey = wideKey;
+    wideNoted = false;
+    if (!have || Android::InMission()) return;
+
+    int W = 0, left = 0;
+    if (!WideGeometry(W, left) || W != key.W || left != key.left) return;
+    const SDL_Rect vp = Android::Viewport();
+    const Common::Point win = System::GetResolution();
+
+    WideFillCache *slot = nullptr;
+    for (auto &c : wideCache)
+        if (c.tex && c.key == key) { slot = &c; break; }
+
+    GfxStates save = _states;
+    if (!slot) {
+        if (widePending.empty() || !(widePendingKey == key)) return;
+        slot = &wideCache[0];
+        for (auto &c : wideCache) if (c.used < slot->used) slot = &c;
+        if (!slot->tex) glGenTextures(1, &slot->tex);
+        _states.Tex = slot->tex;
+        SetRenderStates(0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, key.W, 480, 0, GL_RGBA, GL_UNSIGNED_BYTE, widePending.data());
+        slot->key = key;
+        widePending.clear(); widePending.shrink_to_fit();
+        SDL_Log("DroidUA widescreen fill built: %dx480 (left %d)", key.W, key.left);
+    }
+    slot->used = wideFrame;
+
+    // Draw across the whole window width, same vertical band as the 4:3 viewport.
+    glViewport(0, win.y - vp.y - vp.h, win.x, vp.h);
+    SetProjectionMatrix( mat4x4f() );
+    SetModelViewMatrix( mat4x4f() );
+    _states.DepthTest = false;
+    _states.Zwrite = false;
+    _states.AlphaBlend = false;
+    _states.Tex = slot->tex;
+    _states.TexBlend = 2;
+    _states.Prog = _stdShaderProg;
+    _states.AlphaTest = false;
+    _states.Shaded = true;
+    _states.Fog = false;
+    _states.LinearFilter = true;
+    SetRenderStates(0);
+    // Only the two side strips: the 4:3 centre may hold 3D (briefing model).
+    auto strip = [&](float x0, float x1, float u0, float u1) {
+        if (x1 <= x0) return;
+        std::array<TVertex, 4> vtx = {
+            GFX::TVertex( vec3f(x0,  1.0, 0.0), tUtV(u0, 0.0) ),
+            GFX::TVertex( vec3f(x0, -1.0, 0.0), tUtV(u0, 1.0) ),
+            GFX::TVertex( vec3f(x1, -1.0, 0.0), tUtV(u1, 1.0) ),
+            GFX::TVertex( vec3f(x1,  1.0, 0.0), tUtV(u1, 0.0) )
+        };
+        DrawVtxQuad(vtx);
+    };
+    const float lx = -1.0f + 2.0f * vp.x / win.x, rx = -1.0f + 2.0f * (vp.x + vp.w) / win.x;
+    strip(-1.0f, lx, 0.0f, float(left) / W);
+    strip(rx, 1.0f, float(left + 640) / W, 1.0f);
+    _states = save;
+    SetRenderStates(0);
+    Android::SetViewport();
+}
+#endif
+
+#ifdef __ANDROID__
+namespace {
+struct TouchTex { GLuint tex = 0; int w = 0, h = 0; };
+std::map<std::string, TouchTex> touchTextures;
+}
+
+void GFXEngine::DrawAndroidTouchOverlay()
+{
+    static std::vector<NC_STACK_winp::AndroidTouchItem> items;
+    NC_STACK_winp::AndroidCollectTouchControls(items);
+    if (items.empty()) return;
+
+    const SDL_Rect vp = Android::Viewport();
+    const Common::Point win = System::GetResolution();
+    const Common::Point logical = GetScreenSize();
+    if (vp.w <= 0 || vp.h <= 0 || logical.x <= 0 || logical.y <= 0) return;
+    const float sx = float(vp.w) / logical.x, sy = float(vp.h) / logical.y;
+    const float scale = sy;
+    const float opacity = Android::TouchOpacity() / 100.0f;
+    const float labelOpacity = std::min(1.0f, opacity * 1.5f + 40.0f / 255.0f);
+
+    if (touchTextures.size() > 96) { // layout/scale changed a lot: start over
+        for (auto &t : touchTextures) glDeleteTextures(1, &t.second.tex);
+        touchTextures.clear();
+    }
+
+    GfxStates save = _states;
+    auto texture = [&](const std::string &key, const std::function<AndroidTouchSprites::Sprite()> &make) -> TouchTex * {
+        auto it = touchTextures.find(key);
+        if (it != touchTextures.end()) return it->second.tex ? &it->second : nullptr;
+        AndroidTouchSprites::Sprite sp = make();
+        TouchTex &t = touchTextures[key];
+        if (sp.w <= 0 || sp.h <= 0) return nullptr;
+        glGenTextures(1, &t.tex);
+        _states.Tex = t.tex;
+        SetRenderStates(0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, sp.w, sp.h, 0, GL_RGBA, GL_UNSIGNED_BYTE, sp.rgba.data());
+        t.w = sp.w; t.h = sp.h;
+        return &t;
+    };
+
+    glViewport(0, 0, win.x, win.y);
+    SetProjectionMatrix( mat4x4f() );
+    SetModelViewMatrix( mat4x4f() );
+    _states.DepthTest = false;
+    _states.Zwrite = false;
+    _states.AlphaBlend = true;
+    _states.SrcBlend = GL_ONE;                 // sprites are premultiplied
+    _states.DstBlend = GL_ONE_MINUS_SRC_ALPHA;
+    _states.TexBlend = 2;
+    _states.Prog = _stdShaderProg;
+    _states.AlphaTest = false;
+    _states.Shaded = true;
+    _states.Fog = false;
+    _states.LinearFilter = true;
+
+    // Draw a texture with its top-left at window pixel (x, y), 1:1 pixel size.
+    auto quad = [&](TouchTex *t, float x, float y, float alpha) {
+        if (!t) return;
+        x = std::round(x); y = std::round(y);
+        const float x0 = -1.0f + 2.0f * x / win.x, x1 = -1.0f + 2.0f * (x + t->w) / win.x;
+        const float y0 = 1.0f - 2.0f * y / win.y, y1 = 1.0f - 2.0f * (y + t->h) / win.y;
+        const TGLColor c(alpha, alpha, alpha, alpha);
+        std::array<TVertex, 4> vtx = {
+            GFX::TVertex( vec3f(x0, y0, 0.0), tUtV(0.0, 0.0), c ),
+            GFX::TVertex( vec3f(x0, y1, 0.0), tUtV(0.0, 1.0), c ),
+            GFX::TVertex( vec3f(x1, y1, 0.0), tUtV(1.0, 1.0), c ),
+            GFX::TVertex( vec3f(x1, y0, 0.0), tUtV(1.0, 0.0), c )
+        };
+        _states.Tex = t->tex;
+        SetRenderStates(0);
+        DrawVtxQuad(vtx);
+    };
+
+    for (const auto &it : items)
+    {
+        const float cx = vp.x + it.x * sx, cy = vp.y + it.y * sy, r = it.r * scale;
+        const int rKey = int(std::lround(r * 4));
+        const std::string base = "c" + std::to_string(rKey) + (it.pad ? "p" : "b") + (it.held ? "h" : "n");
+        TouchTex *face = texture(base, [&] { return AndroidTouchSprites::Control(rKey / 4.0f, scale, it.pad, it.held); });
+        if (face) quad(face, cx - face->w / 2.0f, cy - face->h / 2.0f, opacity);
+
+        if (it.pad)
+        {
+            TouchTex *knob = texture("k" + std::to_string(int(std::lround(scale * 100))), [&] { return AndroidTouchSprites::Knob(scale); });
+            if (knob) quad(knob, vp.x + it.knobX * sx - knob->w / 2.0f, vp.y + it.knobY * sy - knob->h / 2.0f, opacity);
+        }
+
+        const int maxW = int(it.r * 1.7f * scale);
+        TouchTex *label = texture("l" + it.label + "#" + std::to_string(maxW) + "#" + std::to_string(int(std::lround(scale * 100))),
+                                  [&] { return AndroidTouchSprites::Label(it.label, scale, float(maxW)); });
+        if (label)
+        {
+            float ly = cy - label->h / 2.0f;
+            if (it.pad)
+            {
+                ly = cy + r * 0.55f + scale;
+                if (ly + label->h > cy + r - scale) ly = cy + r - scale - label->h;
+            }
+            quad(label, cx - label->w / 2.0f, ly, labelOpacity);
+        }
+    }
+
+    _states = save;
+    SetRenderStates(0);
+    Android::SetViewport();
+}
+#endif
 
 uint32_t GFXEngine::CompileShader(int32_t type, const std::string &string)
 {

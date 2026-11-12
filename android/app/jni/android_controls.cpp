@@ -13,6 +13,8 @@ void UAAndroidPanMap(float x,float y);
 #include "system/system.h"
 #include <algorithm>
 #include <cmath>
+#include <cctype>
+#include <string>
 
 namespace {
 struct TouchFinger { int control; float x,y; };
@@ -320,41 +322,26 @@ bool NC_STACK_winp::AndroidTouchEvent(SDL_Event *event)
     return true;
 }
 
-void NC_STACK_winp::AndroidDrawTouchControls(SDL_Surface *screen)
+void NC_STACK_winp::AndroidCollectTouchControls(std::vector<AndroidTouchItem> &items)
 {
+    items.clear();
     if(!Android::TouchVisible() || !touchPlaying) return;
-    static std::shared_ptr<TTF_Font> font(System::LoadFont("Liberation Sans",13),TTF_CloseFont);
-    static std::map<std::string,std::shared_ptr<SDL_Surface>> labels;
-    auto circle=[&](int cx,int cy,int radius,Uint32 color) {
-        for(int y=-radius;y<=radius;++y) {
-            int x=int(std::sqrt(float(radius*radius-y*y)));
-            SDL_Rect row{cx-x,cy+y,2*x+1,1}; SDL_FillRect(screen,&row,color);
-        }
-    };
     auto layout=TouchLayout();
-    const Uint8 alpha=Uint8(Android::TouchOpacity()*255/100);
     for(int i=0;i<int(layout.size());++i) {
         if(!layout[i].enabled) continue;
-        bool held=false; float x=layout[i].x,y=layout[i].y;
-        for(const auto &f:fingers) if(f.second.control==i) {held=true;x=f.second.x;y=f.second.y;}
-        auto c=layout[i];
-        circle(int(c.x),int(c.y),int(c.r),SDL_MapRGBA(screen->format,140,200,210,alpha));
-        circle(int(c.x),int(c.y),int(c.r)-2,SDL_MapRGBA(screen->format,held?45:12,held?90:30,held?100:40,alpha));
-        if(i<2 && held) {
-            float dx=x-c.x,dy=y-c.y,length=std::sqrt(dx*dx+dy*dy);
+        const auto &c=layout[i];
+        bool held=false; float fx=c.x,fy=c.y;
+        for(const auto &f:fingers) if(f.second.control==i) {held=true;fx=f.second.x;fy=f.second.y;}
+        AndroidTouchItem it;
+        it.x=c.x; it.y=c.y; it.r=c.r; it.pad=i<2; it.held=held; it.knobX=c.x; it.knobY=c.y;
+        if(it.pad && held) {
+            float dx=fx-c.x,dy=fy-c.y,length=std::sqrt(dx*dx+dy*dy);
             if(length>c.r*.65f) {dx*=c.r*.65f/length;dy*=c.r*.65f/length;}
-            circle(int(c.x+dx),int(c.y+dy),12,SDL_MapRGBA(screen->format,100,200,220,alpha));
+            it.knobX=c.x+dx; it.knobY=c.y+dy;
         }
-        auto &text=labels[c.label];
-        if(!text && font) text.reset(TTF_RenderUTF8_Blended(font.get(),c.label,SDL_Color{235,250,255,255}),SDL_FreeSurface);
-        if(text) {
-            SDL_SetSurfaceAlphaMod(text.get(),alpha);
-            // Fit SELECT inside the existing compact button without stretching.
-            int width=std::min(text->w,int(c.r*1.65f));
-            int height=text->h*width/std::max(text->w,1);
-            SDL_Rect dst{int(c.x)-width/2,int(c.y)-height/2,width,height};
-            SDL_BlitScaled(text.get(),nullptr,screen,&dst);
-        }
+        it.label=c.label;
+        for(char &ch:it.label) ch=char(std::toupper((unsigned char)ch));
+        items.push_back(it);
     }
 }
 #endif

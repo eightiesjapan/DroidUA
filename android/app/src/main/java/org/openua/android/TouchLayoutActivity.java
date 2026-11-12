@@ -44,7 +44,7 @@ public class TouchLayoutActivity extends Activity {
     }
     private void add(LinearLayout bar,String label,Runnable action) {
         Button b=new Button(this); b.setText(label); b.setAllCaps(false); b.setTextColor(0xffb9f4f7); b.setTextSize(15); b.setOnClickListener(v->action.run());
-        b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(0xff19313b));
+        UaStyle.button(b);
         bar.addView(b,new LinearLayout.LayoutParams(0,-1,1));
     }
     @Override public void onBackPressed() {
@@ -85,11 +85,22 @@ public class TouchLayoutActivity extends Activity {
             TouchLayoutConfig.Control[] list=controls();
             for(int i=0;i<list.length;++i) {
                 TouchLayoutConfig.Control c=list[i];
-                paint.setStyle(Paint.Style.FILL);paint.setColor(!c.enabled?0x704c565b:(i==selected?0xff285862:0xe00b303b));canvas.drawCircle(c.x,c.y,c.r,paint);
-                paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.4f);paint.setColor(c.enabled?0xff6ddce6:0xff6c7a80);canvas.drawCircle(c.x,c.y,c.r,paint);
-                paint.setStyle(Paint.Style.FILL);paint.setTextSize(13);float length=paint.measureText(c.label);
+                // Same look as the in-game overlay: dark rim, steel edge, bevel gradient, cyan glow.
+                paint.setShader(null);paint.setStyle(Paint.Style.FILL);
+                paint.setColor(0xff080e12);canvas.drawCircle(c.x,c.y,c.r,paint);
+                paint.setColor(c.enabled?0xff78999f:0xff4a5b5f);canvas.drawCircle(c.x,c.y,c.r-1,paint);
+                boolean held=i==selected;
+                int top=!c.enabled?0xff2a3a3f:(held?0xff6996a2:0xff4e7078), bottom=!c.enabled?0xff182226:(held?0xff2b4a52:0xff1c2a30);
+                paint.setShader(new android.graphics.LinearGradient(0,c.y-c.r,0,c.y+c.r,top,bottom,android.graphics.Shader.TileMode.CLAMP));
+                canvas.drawCircle(c.x,c.y,c.r-2,paint);paint.setShader(null);
+                if(i<2) { paint.setColor(0xff0a161c);canvas.drawCircle(c.x,c.y,c.r*.55f,paint); }
+                paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(1.4f);paint.setColor(c.enabled?0xff3c96a5:0xff24474d);
+                canvas.drawArc(new RectF(c.x-c.r+2,c.y-c.r+2,c.x+c.r-2,c.y+c.r-2),30,120,false,paint);
+                paint.setStyle(Paint.Style.FILL);paint.setTypeface(UaStyle.font(getContext()));String label=c.label.toUpperCase(java.util.Locale.ROOT);paint.setTextSize(13);float length=paint.measureText(label);
                 if(length>c.r*1.65f) paint.setTextSize(13*c.r*1.65f/length);
-                canvas.drawText(c.label,c.x,c.y-(paint.ascent()+paint.descent())/2,paint);
+                paint.setColor(0xff000000);canvas.drawText(label,c.x+1,c.y+1-(paint.ascent()+paint.descent())/2,paint);
+                paint.setColor(c.enabled?0xffdcf0f0:0xff6c7a80);
+                canvas.drawText(label,c.x,c.y-(paint.ascent()+paint.descent())/2,paint);
             }
             canvas.restore();
         }

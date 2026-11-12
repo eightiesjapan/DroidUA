@@ -99,6 +99,12 @@ void NC_STACK_button::UpdateSlider(button_str2 *sbt)
 
     int v7 = sbt->width / (sbttt->max - sbttt->min + 1) + 1;
 
+#ifdef __ANDROID__
+    // Finger-sized slider handle (the desktop minimum of 6 px is too thin to grab).
+    const int minThumb = std::min<int>(20, sbt->width / 3);
+    if ( v7 < minThumb )
+        v7 = minThumb;
+#endif
     if ( v7 < 6 )
         v7 = 6;
 
@@ -396,9 +402,16 @@ NC_STACK_button::ResCode NC_STACK_button::ProcessWidgetsEvents(TInputState *arg)
                     if (it->flags & FLAG_PRESSED)
                         result = ResCode(it->pressed_id, it->button_id);
 
+#ifdef __ANDROID__
+                    // Handle follows the finger 1:1 along its travel.
+                    const int travel = std::max(1, it->width - (sbttt->field_8_ - sbttt->field_6_));
+                    int v21 = (arg->ClickInf.move.ScreenPos.x - sbttt->scrDownX) * (sbttt->max - sbttt->min);
+                    sbttt->value = sbttt->oldValue + v21 / travel;
+#else
                     int v21 = (arg->ClickInf.move.ScreenPos.x - sbttt->scrDownX) * (sbttt->max - sbttt->min + 1);
 
                     sbttt->value = sbttt->oldValue + v21 / it->width;
+#endif
 
                     if ( sbttt->value < sbttt->min )
                         sbttt->value = sbttt->min;
@@ -479,6 +492,18 @@ NC_STACK_button::ResCode NC_STACK_button::ProcessWidgetsEvents(TInputState *arg)
                     if ( arg->ClickInf.flag & TClickBoxInf::FLAG_BTN_DOWN )
                     {
                         Slider *sbttt = sbt.field_41C;
+#ifdef __ANDROID__
+                        // Touch: jump the handle under the finger and drag from there.
+                        {
+                            const int thumb = sbttt->field_8_ - sbttt->field_6_;
+                            const int travel = std::max(1, sbt.width - thumb);
+                            int v = sbttt->min + ((arg->ClickInf.ldw_pos.BtnPos.x - thumb / 2) * (sbttt->max - sbttt->min) + travel / 2) / travel;
+                            sbttt->value = std::max<int>(sbttt->min, std::min<int>(sbttt->max, v));
+                            sbttt->pressPart = 2;
+                            sbttt->oldValue = sbttt->value;
+                            sbttt->scrDownX = arg->ClickInf.ldw_pos.ScreenPos.x;
+                        }
+#else
                         if ( arg->ClickInf.ldw_pos.BtnPos.x < sbttt->field_6_ )
                         {
                             sbttt->pressPart = 1;
@@ -497,6 +522,7 @@ NC_STACK_button::ResCode NC_STACK_button::ProcessWidgetsEvents(TInputState *arg)
                             if ( sbttt->value < sbttt->max )
                                 sbttt->value += 1;
                         }
+#endif
 
                         sbt.flags |= FLAG_PRESSED | FLAG_DOWN;
                         result = ResCode(sbt.down_id, sbt.button_id);
@@ -737,12 +763,42 @@ void NC_STACK_button::button_func70__sub0(button_str2 *sbt, CmdStream *pbuf)
 }
 
 #ifdef __ANDROID__
-bool NC_STACK_button::AndroidDrawButton(size_t index)
+// Large touch buttons keep the original 1998 artwork: the button's own tileset
+// border/fill glyphs are 3-slice stretched to the taller hit box (top bevel and
+// bottom glow rows stay pixel-exact), and the caption goes through the engine's
+// normal text path so it keeps the original game font and drop shadow.
+static void AndroidDrawTileStretched(TileMap *tiles, uint8_t c, SDL_Surface *dst, int dx, int dy, int dw, int dh, bool column)
+{
+    if(!tiles || !tiles->img || dw<=0 || dh<=0) return;
+    SDL_Surface *src=tiles->img->GetSwTex();
+    if(!src) return;
+    const Common::PointRect &g=tiles->map[c];
+    const int sh=g.h, sw=column ? 1 : g.w;
+    if(sh<=0 || sw<=0) return;
+    const int cap=std::min(3,sh/3);
+    for(int r=0;r<dh;++r) {
+        int sr;
+        if(r<cap) sr=r;
+        else if(r>=dh-cap) sr=sh-(dh-r);
+        else sr=cap+(r-cap)*std::max(1,sh-2*cap)/std::max(1,dh-2*cap);
+        sr=std::max(0,std::min(sh-1,sr));
+        Common::Rect s(g.x,g.y+sr,g.x+sw,g.y+sr+1);
+        Common::Rect d(dx,dy+r,dx+dw,dy+r+1);
+        GFX::GFXEngine::DrawFill(src,s,dst,d);
+    }
+}
+
+bool NC_STACK_button::AndroidDrawButton(size_t index, CmdStream *pbuf)
 {
     auto &b=field_d8[index];
     if(Android::InMission() || b.button_type!=TYPE_BUTTON || !(b.flags&FLAG_TEXT) ||
        !(b.flags&FLAG_BORDER) || ((b.button_id>=6000 && b.button_id<=6004) || b.button_id==6008)) return false;
-    const int base=GFX::Engine.GetTileset(b.tileset_up)->h;
+    const bool pressed=(b.flags&FLAG_PRESSED) && !(b.flags&FLAG_NOPRESS);
+    const bool disabled=b.flags&FLAG_DISABLED;
+    const int tileId=disabled ? b.field_42E : (pressed ? b.tileset_down : b.tileset_up);
+    TileMap *tiles=GFX::Engine.GetTileset(tileId);
+    if(!tiles) return false;
+    const int base=tiles->h;
     int top=std::max(0,std::min(int(b.ypos)-(24-base)/2,int(h)-24));
     int bottom=std::min(int(h),top+24);
     // Keep dense dialogs/Options rows separated; roomy menu rows grow to 24.
@@ -754,24 +810,25 @@ bool NC_STACK_button::AndroidDrawButton(size_t index)
     }
     if(bottom-top<=base) return false;
     auto &hit=buttons[index];
-    if(!(b.flags&FLAG_DISABLED)) {hit.x=b.xpos;hit.y=top;hit.w=b.width;hit.h=bottom-top;}
-    auto screen=GFX::Engine.Screen();
-    SDL_Rect frame{x+b.xpos,y+top,b.width,bottom-top};
-    SDL_FillRect(screen,&frame,SDL_MapRGBA(screen->format,120,153,159,255));
-    SDL_Rect inner{frame.x+1,frame.y+1,frame.w-2,frame.h-2};
-    bool pressed=b.flags&FLAG_PRESSED, disabled=b.flags&FLAG_DISABLED;
-    SDL_FillRect(screen,&inner,SDL_MapRGBA(screen->format,pressed?38:70,pressed?63:99,pressed?72:110,255));
-    static std::shared_ptr<TTF_Font> font(System::LoadFont("Liberation Sans",14),TTF_CloseFont);
-    const auto &caption=pressed ? b.caption2 : b.caption;
-    SDL_Color color{Uint8(disabled?110:b.txt_r),Uint8(disabled?130:b.txt_g),Uint8(disabled?130:b.txt_b),255};
-    if(font) {
-        std::unique_ptr<SDL_Surface,decltype(&SDL_FreeSurface)> label(TTF_RenderUTF8_Blended(font.get(),caption.c_str(),color),SDL_FreeSurface);
-        if(label) {
-            int width=std::min(label->w,inner.w-6),height=std::min(label->h,inner.h);
-            SDL_Rect dest{frame.x+(frame.w-width)/2,frame.y+(frame.h-height)/2,width,height};
-            SDL_BlitScaled(label.get(),nullptr,screen,&dest);
-        }
-    }
+    if(!disabled) {hit.x=b.xpos;hit.y=top;hit.w=b.width;hit.h=bottom-top;}
+
+    SDL_Surface *screen=GFX::Engine.Screen();
+    const int fx=x+b.xpos, fy=y+top, fw=b.width, fh=bottom-top;
+    const int lw=std::min<int>(tiles->map[field_19c].w,fw/2);
+    const int rw=std::min<int>(tiles->map[field_19D].w,fw-lw);
+    AndroidDrawTileStretched(tiles,field_19c,screen,fx,fy,lw,fh,false);
+    AndroidDrawTileStretched(tiles,field_19E,screen,fx+lw,fy,fw-lw-rw,fh,true);
+    AndroidDrawTileStretched(tiles,field_19D,screen,fx+fw-rw,fy,rw,fh,false);
+
+    // Caption: same command sequence as button_func70__sub1, vertically centred.
+    int flag=pressed ? 16 : 0;
+    if(b.flags&FLAG_CENTER) flag|=4; else if(b.flags&FLAG_RALIGN) flag|=2; else flag|=1;
+    FontUA::select_tileset(pbuf,tileId);
+    FontUA::set_center_xpos(pbuf,fx+lw-(screen_width/2));
+    FontUA::set_center_ypos(pbuf,fy+(fh-base)/2-(screen_height/2));
+    FontUA::copy_position(pbuf);
+    FontUA::set_txtColor(pbuf,b.txt_r,b.txt_g,b.txt_b);
+    FontUA::add_txt(pbuf,fw-lw-rw,flag,(b.flags&FLAG_PRESSED) ? b.caption2 : b.caption);
     return true;
 }
 #endif
@@ -789,7 +846,7 @@ size_t NC_STACK_button::Draw()
             if ( it->flags & FLAG_DRAW )
             {
 #ifdef __ANDROID__
-                if(AndroidDrawButton(size_t(it-field_d8.begin()))) continue;
+                if(AndroidDrawButton(size_t(it-field_d8.begin()),&button_tmpbuf)) continue;
 #endif
                 if ( it->flags & FLAG_TEXT )
                     button_func70__sub1(&*it, &button_tmpbuf);

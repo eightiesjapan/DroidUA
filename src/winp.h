@@ -1,6 +1,8 @@
 #ifndef WINP_H_INCLUDED
 #define WINP_H_INCLUDED
 
+#include <vector>
+#include <string>
 #include <map>
 #include <queue>
 #include "idev.h"
@@ -43,7 +45,10 @@ public:
     static void AndroidReset();
     static void AndroidPoll(bool playing, bool &grabbed);
     static bool AndroidTouchEvent(SDL_Event *event);
-    static void AndroidDrawTouchControls(SDL_Surface *screen);
+    // Touch overlay items in logical screen coordinates; drawn by the renderer
+    // at native resolution (crisp, anti-aliased) after the 2D layer.
+    struct AndroidTouchItem { float x, y, r, knobX, knobY; bool pad, held; std::string label; };
+    static void AndroidCollectTouchControls(std::vector<AndroidTouchItem> &items);
     static void AndroidApply(TInputState *input, bool playing, bool &grabbed);
     static Common::Point AndroidPointer() { return _mPos; }
 #endif
