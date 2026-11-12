@@ -19,6 +19,8 @@ import java.util.concurrent.Executors;
 
 /** Runs separately from SDL, so a clean engine exit can return to this screen. */
 public class LauncherActivity extends Activity {
+    /** Set when the game asks for this screen (Options > Exit to Launcher). */
+    static final String EXTRA_SHOW="org.openua.android.SHOW_LAUNCHER";
     private static final int IMPORT=10, BACKUP=11, RESTORE=12, DIAGNOSTICS=13;
     private static final int BACKGROUND=Color.rgb(7,18,24), CYAN=Color.rgb(109,220,230), TEXT=Color.rgb(225,239,241);
     private final java.util.concurrent.ExecutorService worker=Executors.newSingleThreadExecutor();
@@ -26,12 +28,25 @@ public class LauncherActivity extends Activity {
     private TextView status,description;
     private Button play,backup,undo;
     private ProgressBar progress;
-    private boolean busy=false;
+    private boolean busy=false, starting=false;
+    private Runnable pendingTap;
     private File files,game;
     private int dp(int value) { return Math.round(value*getResources().getDisplayMetrics().density); }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         files=getFilesDir(); game=new File(files,"game");
+        // Game files already installed: go straight to the game. The launcher
+        // still appears when files are missing, a restore must be finished, or
+        // the player chose Options > Exit to Launcher.
+        if(state==null && !getIntent().getBooleanExtra(EXTRA_SHOW,false) &&
+           GameFiles.missing(game).isEmpty() && !new File(files,"restore-pending").exists()) {
+            final android.content.Context app=getApplicationContext();
+            new Thread(()->CrashReports.collect(app),"DroidUA-crash-collect").start(); // still save crash reports
+            startActivity(new Intent(this,OpenUAActivity.class));
+            finish();
+            overridePendingTransition(0,0);
+            return;
+        }
         getWindow().setStatusBarColor(BACKGROUND); getWindow().setNavigationBarColor(BACKGROUND);
         ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(BACKGROUND);
         LinearLayout content=new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL); content.setPadding(dp(24),dp(20),dp(24),dp(24));
@@ -60,27 +75,34 @@ public class LauncherActivity extends Activity {
         progress=new ProgressBar(this); progress.setVisibility(View.GONE); content.addView(progress);
         status=label("",15,CYAN); status.setPadding(0,dp(12),0,0); content.addView(status);
         refresh();
-        busy=true; progress.setVisibility(View.VISIBLE); refresh();
+        // Startup recovery check: keep the buttons enabled (disabling them briefly
+        // made the first finger tap vanish on some phones); a tap that arrives
+        // before the check finishes simply runs right after it.
+        starting=true;
         worker.execute(()-> {
             try(GameFiles.Session session=new GameFiles.Session(files)) { GameFiles.recover(files); }
             catch(IOException error) { if(new File(files,"restore-pending").exists()) runOnUiThread(()->message(error.getMessage())); }
-            runOnUiThread(()-> { busy=false; progress.setVisibility(View.GONE); refresh(); });
+            runOnUiThread(()-> {
+                starting=false; refresh();
+                Runnable queued=pendingTap; pendingTap=null;
+                if(queued!=null) queued.run();
+            });
         });
     }
     @Override public void onResume() {
         super.onResume(); if(description!=null) refresh();
         worker.execute(()-> { String report=CrashReports.collect(this); if(report!=null) runOnUiThread(()->status.setText(report)); });
     }
-    private LinearLayout.LayoutParams weighted() { return new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1); }
+    private LinearLayout.LayoutParams weighted() { return new LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.MATCH_PARENT,1); } // equal heights when a label wraps
     private TextView label(String text,int size,int color) { TextView v=new TextView(this); v.setText(text); v.setTextSize(size); v.setTextColor(color); return v; }
     private Button button(String text,Runnable action) {
         Button b=new Button(this); b.setText(text); b.setAllCaps(false); b.setTextSize(17); b.setTextColor(TEXT);
-        b.setMinHeight(dp(54)); b.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(25,49,59)));
-        b.setOnClickListener(v->action.run()); actions.add(b); return b;
+        b.setMinHeight(dp(54)); UaStyle.button(b);
+        b.setOnClickListener(v-> { if(starting) pendingTap=action; else action.run(); }); actions.add(b); return b;
     }
     private void refresh() {
         boolean ready=GameFiles.missing(game).isEmpty() && !new File(files,"restore-pending").exists();
-        description.setText(ready?"Your game files are ready. Exit the game to return here for backups or updates."
+        description.setText(ready?"Your game files are ready. DroidUA now opens straight into the game; use Options > Exit to Launcher to come back here for backups or updates."
             :"Welcome! Download and extract the OpenUA standalone package, then import its folder once. Your original folder stays untouched.");
         for(Button b:actions) b.setEnabled(!busy);
         play.setEnabled(!busy && ready); backup.setEnabled(!busy && ready);
@@ -195,7 +217,7 @@ public class LauncherActivity extends Activity {
     private void openWeb(String url) { try { startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(url))); } catch(ActivityNotFoundException e) { message(url); } }
     private void about() {
         String credits="DroidUA "+BuildConfig.VERSION_NAME+"\nUrban Assault for Android\n\n"+
-            "Android adaptation built with OpenAI GPT Sol and Astra; coordinated and play-tested by eightiesjapan.\n\n"+
+            "Android adaptation built with the help of AI coding assistants OpenAI GPT Sol and Astra and Anthropic Claude; coordinated and play-tested by eightiesjapan.\n\n"+
             "Based on OpenUA / UA:Source by Marisa-Chan and contributors. Thanks to the Metropolis Dawn / Stoudson Corporation community for keeping Urban Assault alive.\n\n"+
             "Original Urban Assault: TerraTools and Microsoft. Original game content remains the property of its respective owners. This is an unofficial community project.\n\n"+
             "Engine source: GPLv2. Original game data is supplied separately.\nhttps://github.com/Marisa-Chan/UA_source\nhttps://metropolisdawn.de\n\n"+

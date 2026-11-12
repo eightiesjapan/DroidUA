@@ -3812,8 +3812,14 @@ bool NC_STACK_ypaworld::CreateVideoControls()
                                                                                                                                             btn_64arg.xpos = bottomThirdBtnPosX;
                                                                                                                                             btn_64arg.ypos = bottomButtonsY;
                                                                                                                                             btn_64arg.width = button1LineWidth;
+#ifdef __ANDROID__
+                                                                                                                                            // Options has no help page on Android: this slot opens the launcher instead.
+                                                                                                                                            btn_64arg.caption = "Exit to Launcher";
+                                                                                                                                            btn_64arg.upCode = 6109;
+#else
                                                                                                                                             btn_64arg.caption = Locale::Text::Common(Locale::CMN_HELP);
                                                                                                                                             btn_64arg.upCode = 1250;
+#endif
                                                                                                                                             btn_64arg.caption2.clear();
                                                                                                                                             btn_64arg.downCode = 0;
                                                                                                                                             btn_64arg.pressedCode = 0;

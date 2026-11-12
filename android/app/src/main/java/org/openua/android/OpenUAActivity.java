@@ -36,7 +36,22 @@ public class OpenUAActivity extends org.libsdl.app.SDLActivity {
     }
     @Override public void onWindowFocusChanged(boolean focused) {
         super.onWindowFocusChanged(focused);
-        if (focused) useFullDisplay();
+        if (focused) { useFullDisplay(); hintFrameRate(); }
+    }
+    /** Tell high-refresh displays (e.g. 120 Hz phones) that the game renders at a
+     *  fixed rate, so the compositor can pick a matching mode for even pacing. */
+    private void hintFrameRate() {
+        if (android.os.Build.VERSION.SDK_INT < 30 || mSurface == null) return;
+        int fps=60;
+        try(java.util.Scanner s=new java.util.Scanner(new File(getFilesDir(),"game/android-settings.cfg"))) {
+            while(s.hasNext()) { String key=s.next(); if(!s.hasNextInt()) break; int v=s.nextInt(); if(key.equals("fps")) fps=v; }
+        } catch(java.io.IOException|RuntimeException ignored) {}
+        if (fps < 20 || fps > 240) fps=60;
+        try {
+            android.view.Surface surface=mSurface.getHolder().getSurface();
+            if (surface != null && surface.isValid())
+                surface.setFrameRate(fps, android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
+        } catch(RuntimeException ignored) {}
     }
     @Override protected void onDestroy() {
         boolean finished=isFinishing();
@@ -49,6 +64,14 @@ public class OpenUAActivity extends org.libsdl.app.SDLActivity {
     }
     public void showTouchLayoutEditor() {
         runOnUiThread(()->startActivity(new android.content.Intent(this,TouchLayoutActivity.class)));
+    }
+    /** Options > Exit to Launcher: close the engine (releasing the save lock) and
+     *  show the launcher for backups, restore or a new import. */
+    public void openLauncher() {
+        runOnUiThread(()-> {
+            startActivity(new android.content.Intent(this,LauncherActivity.class).putExtra(LauncherActivity.EXTRA_SHOW,true));
+            finish();
+        });
     }
     public void showGamepadSettings() {
         runOnUiThread(()->startActivity(new android.content.Intent(this,GamepadSettingsActivity.class)));

@@ -1218,7 +1218,9 @@ void UserData::ShowToolTip(int id)
     case UIWidgets::MAIN_MENU_WIDGET_IDS::BTN_HELP:
     case 1052:
     case 1107:
-    case 1167:
+#ifndef __ANDROID__
+    case 1167: // Options Help (Exit to Launcher on Android)
+#endif
     case 1218:
         p_YW->SetShowingTooltip(Locale::TIP_MENU_HELP);
         break;
