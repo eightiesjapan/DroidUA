@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <string>
 #include <list>
 #include <SDL2/SDL_image.h>
@@ -274,6 +275,15 @@ void Init(bool oldGL)
         return;
     }
     set_getprocaddress(SDL_GL_GetProcAddress);
+    {
+        // gl4es tuning: keep generated fixed-function shaders in a persistent
+        // Precompiled Shader Archive (no mid-battle compile hitches after the
+        // first encounter of an effect) and keep logcat quiet.
+        const char *storage = SDL_AndroidGetInternalStoragePath();
+        if (storage) setenv("LIBGL_PSA_FOLDER", storage, 1);
+        setenv("LIBGL_NOBANNER", "1", 1);
+        setenv("LIBGL_SILENTSTUB", "1", 1);
+    }
     initialize_gl4es();
     SDL_Log("OpenUA GL: %s / %s", glGetString(GL_VENDOR), glGetString(GL_VERSION));
 #endif

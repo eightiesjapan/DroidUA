@@ -814,6 +814,7 @@ int WinMain__sub0()
 uint32_t maxTicks = 1000/60; // init on 60FPS
 
 #ifdef __ANDROID__
+#include <gl4esinit.h>
 static std::atomic<bool> androidSuspended(false);
 static int AndroidLifecycle(void *,SDL_Event *event)
 {
@@ -937,6 +938,8 @@ int main(int argc, char *argv[])
         // while backgrounded and restores its GL context before returning.
         if(System::ProcessEvents()) break;
         bool quitWhileSleeping=false;
+        // Persist shaders compiled this session (on the GL thread, not the UI thread).
+        if(androidSuspended) gl4es_flush_psa();
         while(androidSuspended) {
             if(System::ProcessEvents()) {quitWhileSleeping=true;break;}
             SDL_Delay(20);
@@ -990,6 +993,7 @@ int main(int argc, char *argv[])
     
 #ifdef __ANDROID__
     SDL_DelEventWatch(AndroidLifecycle,nullptr);
+    gl4es_flush_psa();
 #endif
     ypaworld->DeleteNewGuiElements();
     

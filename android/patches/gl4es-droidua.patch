@@ -1,0 +1,40 @@
+diff --git a/include/gl4esinit.h b/include/gl4esinit.h
+index 79cbb34..e8a86ac 100644
+--- a/include/gl4esinit.h
++++ b/include/gl4esinit.h
+@@ -22,6 +22,8 @@ void set_getmainfbsize(void (APIENTRY_GL4ES *new_getMainFBSize)(int* width, int*
+ void initialize_gl4es(void);
+ // do this to uninitialize GL4ES if init constructors are disabled.
+ void close_gl4es(void);
++// DroidUA: write the precompiled shader archive now (safe to call repeatedly).
++void gl4es_flush_psa(void);
+ // wrapped GetProcAddress
+ void* APIENTRY_GL4ES gl4es_GetProcAddress(const char *name);
+ 
+diff --git a/src/gl/fpe_cache.c b/src/gl/fpe_cache.c
+index 4f16639..9e241a4 100644
+--- a/src/gl/fpe_cache.c
++++ b/src/gl/fpe_cache.c
+@@ -226,6 +226,7 @@ void fpe_writePSA()
+         }
+     );
+     fclose(f);
++    psa->dirty = 0; // DroidUA: repeated flushes skip unchanged archives
+     SHUT_LOGD("Saved a PSA with %d Precompiled Programs\n", psa->size);
+ }
+ 
+diff --git a/src/gl/init.c b/src/gl/init.c
+index 7526d91..7036f4d 100644
+--- a/src/gl/init.c
++++ b/src/gl/init.c
+@@ -760,3 +760,10 @@ void (*const gl4es_ctors[])() = { initialize_gl4es, dll_init_done };
+ void (*const gl4es_dtor)() = close_gl4es;
+ #pragma const_seg()
+ #endif
++
++
++// DroidUA: persist the Precompiled Shader Archive without shutting gl4es down
++// (Android apps are usually killed, so the destructor path never runs).
++EXPORT void gl4es_flush_psa(void) {
++    fpe_writePSA();
++}
