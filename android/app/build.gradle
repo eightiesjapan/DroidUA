@@ -5,15 +5,33 @@ android {
     compileSdk 35
     buildToolsVersion '36.0.0'
     ndkVersion '30.0.16248370'
-    signingConfigs { debug { storeFile rootProject.file('../../Android/debug.keystore') } }
+    // Release signing: the key and its password are read from a private
+    // properties file outside the repository (path from the DROIDUA_SIGNING
+    // environment variable, default ../../../Signing/droidua-release.properties).
+    // Without it, release builds are produced unsigned.
+    def signingFile = file(System.getenv('DROIDUA_SIGNING') ?: rootProject.file('../../../Signing/droidua-release.properties').path)
+    def signing = new Properties()
+    if (signingFile.exists()) signingFile.withInputStream { signing.load(it) }
+    signingConfigs {
+        debug { storeFile rootProject.file('../../Android/debug.keystore') }
+        if (signing.storeFile) {
+            release {
+                storeFile file(signing.storeFile)
+                storePassword signing.storePassword
+                keyAlias signing.keyAlias
+                keyPassword signing.keyPassword
+            }
+        }
+    }
     defaultConfig {
-        applicationId 'org.openua.android.beta'
+        // Permanent public app ID: must never change (Android updates need the
+        // same ID and signing key).
+        applicationId 'io.github.eightiesjapan.droidua'
         minSdk 24
         targetSdk 34
-        // DroidUA 0.6 beta installs beside the main DroidUA app (own ID, data and saves).
-        versionCode 19
-        versionName '0.8.5-beta'
-        resValue 'string', 'app_label', 'DroidUA beta'
+        versionCode 20
+        versionName '0.8-beta'
+        resValue 'string', 'app_label', 'DroidUA'
         testInstrumentationRunner 'org.openua.android.DroidUAIntegrationTest'
         ndk { abiFilters 'arm64-v8a' }
         // Native code is always built optimised (-O2 -g, NDEBUG), even in this
@@ -21,6 +39,18 @@ android {
         // compiled at -O0. -g keeps symbols in the unstripped crash-analysis copies.
         externalNativeBuild { cmake { arguments '-DANDROID_STL=c++_static', '-DCMAKE_POLICY_VERSION_MINIMUM=3.5',
             '-DCMAKE_BUILD_TYPE=RelWithDebInfo' } }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (signing.storeFile) signingConfig signingConfigs.release
+        }
+        debug {
+            // Development builds install beside the public app.
+            applicationIdSuffix '.dev'
+            versionNameSuffix '-dev'
+            resValue 'string', 'app_label', 'DroidUA dev'
+        }
     }
     externalNativeBuild { cmake { path 'jni/CMakeLists.txt'; version '4.1.2' } }
 }
