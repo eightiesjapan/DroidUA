@@ -15,6 +15,10 @@
   <a href="https://metropolisdawn.de/filebase/file/10-openua-standalone-package-full-game/">Get the game files</a>
 </p>
 
+<p align="center">
+  <img src="docs/media/banner.jpg" width="100%" alt="DroidUA running on an Anbernic RG477V next to the original Urban Assault CD">
+</p>
+
 ---
 
 DroidUA brings Urban Assault (Microsoft / TerraTools, 1998) to Android phones and handhelds. It's a *port of a port*: this repository is a fork of **OpenUA / UA_source** by Marisa-Chan and contributors, the open-source re-creation of the Urban Assault engine that made the Windows version possible. DroidUA adds the Android app, touch and gamepad controls, display and performance work on top of it.
@@ -22,6 +26,13 @@ DroidUA brings Urban Assault (Microsoft / TerraTools, 1998) to Android phones an
 > This is a non-commercial community mod project made by a fan. It is not affiliated with or endorsed by Microsoft or TerraTools. **No original game files are included**: you need your own copy of the game data (see [Installing](#installing)).
 
 **Status:** public beta (0.8). Tested on a **Google Pixel 9a** (phone, Android 17) and an **Anbernic RG477V** (Android handheld with built-in controls). Other devices should work but haven't been tested yet.
+
+<table>
+  <tr>
+    <td align="center" width="50%"><img src="docs/media/device-rg477v.jpg" alt="DroidUA on an Anbernic RG477V handheld"><br><sub><b>Anbernic RG477V</b>: built-in gamepad controls</sub></td>
+    <td align="center" width="50%"><img src="docs/media/device-pixel9a.jpg" alt="DroidUA on a Google Pixel 9a phone"><br><sub><b>Google Pixel 9a</b>: touch controls, widescreen</sub></td>
+  </tr>
+</table>
 
 ---
 
@@ -70,6 +81,21 @@ DroidUA was developed with the help of AI coding assistants: **OpenAI GPT (Sol a
 - Save backup/restore to a ZIP, with undo.
 - Replaying a completed mission starts it fresh.
 - Crash reports are saved locally (Download/DroidUA); nothing is uploaded.
+
+---
+
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center" width="50%"><img src="docs/media/screen-main-menu.jpg" alt="Main menu with widescreen side panels"><br><sub>Main menu: widescreen side panels made from the original artwork</sub></td>
+    <td align="center" width="50%"><img src="docs/media/screen-options.jpg" alt="Options screen with Android settings"><br><sub>Options: Menu size, HUD size, touch controls, Invert Look</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="50%"><img src="docs/media/screen-mission-touch.jpg" alt="In a mission with touch controls"><br><sub>In a mission: MOVE slider, LOOK pad and action buttons</sub></td>
+    <td align="center" width="50%"><img src="docs/media/screen-layout-editor.jpg" alt="Touch layout editor"><br><sub>Touch layout editor: drag, show or hide every button</sub></td>
+  </tr>
+</table>
 
 ---
 
