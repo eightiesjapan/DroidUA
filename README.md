@@ -1,8 +1,6 @@
 <p align="center">
-  <img src="docs/media/droidua-icon.png" width="180" alt="DroidUA app icon">
+  <img src="docs/media/droidua-logo.png" width="240" alt="DroidUA">
 </p>
-
-<h1 align="center">DroidUA</h1>
 
 <p align="center">
   <b>Urban Assault on Android</b>: an unofficial port of <a href="https://github.com/Marisa-Chan/UA_source">OpenUA</a>
