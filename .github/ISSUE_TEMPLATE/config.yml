@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Get the game files (OpenUA Standalone Package)
+    url: https://metropolisdawn.de/filebase/file/10-openua-standalone-package-full-game/
+    about: DroidUA needs your own copy of the game data.
+  - name: Install guide
+    url: https://github.com/eightiesjapan/DroidUA#installing
+    about: How to install DroidUA and import the game files.

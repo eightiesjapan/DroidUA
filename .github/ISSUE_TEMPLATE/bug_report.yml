@@ -1,0 +1,64 @@
+name: Bug report
+description: Something doesn't work or crashes in DroidUA
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping test DroidUA! Please fill in what you can. Please don't attach game files or anything copyrighted.
+  - type: input
+    id: version
+    attributes:
+      label: DroidUA version
+      description: Shown in the launcher under the DroidUA title (e.g. 0.8-beta).
+      placeholder: 0.8-beta
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: e.g. Google Pixel 9a, Anbernic RG477V, Samsung Galaxy S24
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android version
+      description: Settings → About phone → Android version
+      placeholder: e.g. Android 17
+    validations:
+      required: true
+  - type: dropdown
+    id: input
+    attributes:
+      label: How were you playing?
+      multiple: true
+      options:
+        - Touchscreen
+        - Built-in handheld controls
+        - Bluetooth / USB gamepad
+        - Mouse
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead? Mention the mission if it's in-game.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce (if you can)
+      placeholder: |
+        1. Start mission ...
+        2. Open the map ...
+        3. ...
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Crash report, screenshots or video
+      description: |
+        After a crash, reopen DroidUA: a report ZIP is saved in **Download/DroidUA** (or use **Export diagnostics** in the launcher). Drag the ZIP, screenshots or a short video into this box.
