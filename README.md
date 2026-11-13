@@ -1,6 +1,23 @@
-# DroidUA
+<p align="center">
+  <img src="docs/media/droidua-icon.png" width="180" alt="DroidUA app icon">
+</p>
 
-**Urban Assault on Android: an unofficial port of [OpenUA](https://github.com/Marisa-Chan/UA_source).**
+<h1 align="center">DroidUA</h1>
+
+<p align="center">
+  <b>Urban Assault on Android</b>: an unofficial port of <a href="https://github.com/Marisa-Chan/UA_source">OpenUA</a>
+  <br>
+  <a href="https://github.com/eightiesjapan/DroidUA/releases"><b>Download the beta »</b></a>
+</p>
+
+<p align="center">
+  <a href="#installing">Install guide</a> ·
+  <a href="#controls">Controls</a> ·
+  <a href="https://github.com/eightiesjapan/DroidUA/issues">Report a bug</a> ·
+  <a href="https://metropolisdawn.de/filebase/file/10-openua-standalone-package-full-game/">Get the game files</a>
+</p>
+
+---
 
 DroidUA brings Urban Assault (Microsoft / TerraTools, 1998) to Android phones and handhelds. It's a *port of a port*: this repository is a fork of **OpenUA / UA_source** by Marisa-Chan and contributors, the open-source re-creation of the Urban Assault engine that made the Windows version possible. DroidUA adds the Android app, touch and gamepad controls, display and performance work on top of it.
 
