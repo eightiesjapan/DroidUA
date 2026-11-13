@@ -167,7 +167,9 @@ public class LauncherActivity extends Activity {
                 String id=DocumentsContract.getTreeDocumentId(uri);
                 Uri root=DocumentsContract.buildDocumentUriUsingTree(uri,id);
                 GameFiles.Source source=new DocumentSource(uri,root,"selected folder",true);
+                final long started=android.os.SystemClock.elapsedRealtime();
                 GameFiles.importGame(source,files,text->runOnUiThread(()->status.setText(text)));
+                android.util.Log.i("DroidUA","Game import finished in "+(android.os.SystemClock.elapsedRealtime()-started)+" ms");
             },"Game files imported. Your saves and settings are ready.");
         } else if(request==BACKUP) {
             job("Creating save backup…",()-> {
